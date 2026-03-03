@@ -1,14 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { Bill } from "@/lib/supabase";
 
-export default function BillsPage() {
+const PER_PAGE = 15;
+
+function getBucket(daysOverdue: number): string {
+  if (daysOverdue < 0) return "current";
+  if (daysOverdue <= 30) return "0-30";
+  if (daysOverdue <= 60) return "31-60";
+  if (daysOverdue <= 90) return "61-90";
+  return "90+";
+}
+
+function daysOverdue(dueDate: string): number {
+  const due = new Date(dueDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  due.setHours(0, 0, 0, 0);
+  return Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+const BUCKET_OPTIONS = [
+  { value: "", label: "All unpaid" },
+  { value: "current", label: "Current" },
+  { value: "0-30", label: "1–30 days" },
+  { value: "31-60", label: "31–60 days" },
+  { value: "61-90", label: "61–90 days" },
+  { value: "90+", label: "90+ days" },
+];
+
+function BillsPageContent() {
+  const searchParams = useSearchParams();
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingLink, setLoadingLink] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [bucketFilter, setBucketFilter] = useState(searchParams.get("bucket") || "");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const bucket = searchParams.get("bucket");
+    if (bucket) setBucketFilter(bucket);
+    const p = searchParams.get("page");
+    if (p) setPage(Math.max(1, parseInt(p, 10)));
+  }, [searchParams]);
 
   const refresh = () => {
     fetch("/api/bills")
@@ -45,85 +83,176 @@ export default function BillsPage() {
     }
   };
 
-  const formatAmount = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+  const formatAmount = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+
+  const unpaidBills = bills.filter((b) => b.balance_cents > 0);
+  const paidBills = bills.filter((b) => b.balance_cents === 0 || b.status === "paid");
+  const filtered = bucketFilter === "paid"
+    ? paidBills
+    : bucketFilter
+      ? unpaidBills.filter((b) => {
+          const d = daysOverdue(b.due_date);
+          return getBucket(d) === bucketFilter;
+        })
+      : unpaidBills;
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const start = (currentPage - 1) * PER_PAGE;
+  const paginated = filtered.slice(start, start + PER_PAGE);
+
+  const updateUrl = (newBucket: string, newPage: number) => {
+    const params = new URLSearchParams();
+    if (newBucket) params.set("bucket", newBucket);
+    if (newPage > 1) params.set("page", String(newPage));
+    const q = params.toString();
+    window.history.replaceState(null, "", q ? `/bills?${q}` : "/bills");
+  };
+
+  const handleBucketChange = (val: string) => {
+    setBucketFilter(val);
+    setPage(1);
+    updateUrl(val, 1);
+  };
+
+  const handlePageChange = (p: number) => {
+    setPage(p);
+    updateUrl(bucketFilter, p);
+  };
 
   return (
-    <main className="min-h-screen bg-slate-50/50">
-      <div className="max-w-5xl mx-auto px-6 py-10">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">Bills</h1>
-          <Link href="/bills/new" className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium transition-colors">
+    <main className="bills-page">
+      <div className="bills-container">
+        <div className="bills-header">
+          <h1 className="bills-title">{bucketFilter === "paid" ? "Paid Bills" : "Bills"}</h1>
+          <Link href="/bills/new" className="btn-primary-sm">
             New Bill
           </Link>
         </div>
+
+        <div className="bills-tabs">
+          <Link
+            href="/bills"
+            className={`bills-tab ${bucketFilter !== "paid" ? "bills-tab-active" : ""}`}
+          >
+            Unpaid
+          </Link>
+          <Link
+            href="/bills?bucket=paid"
+            className={`bills-tab ${bucketFilter === "paid" ? "bills-tab-active" : ""}`}
+          >
+            Paid ({paidBills.length})
+          </Link>
+        </div>
+
         {loading ? (
-          <p className="text-slate-500">Loading...</p>
+          <p className="bills-loading">Loading...</p>
         ) : bills.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
-            <p className="text-slate-500 mb-4">No bills yet. Create one to get started.</p>
-            <Link href="/bills/new" className="text-emerald-600 font-medium hover:text-emerald-700">
-              Create your first bill →
-            </Link>
+          <div className="bills-empty">
+            <p>No bills yet. Create one to get started.</p>
+            <Link href="/bills/new" className="dash-link">Create your first bill →</Link>
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="text-left p-4 text-slate-600 font-medium">Customer</th>
-                  <th className="text-left p-4 text-slate-600 font-medium">Description</th>
-                  <th className="text-left p-4 text-slate-600 font-medium">Amount</th>
-                  <th className="text-left p-4 text-slate-600 font-medium">Due Date</th>
-                  <th className="text-left p-4 text-slate-600 font-medium">Status</th>
-                  <th className="text-left p-4 text-slate-600 font-medium">Payment</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bills.map((b) => (
-                  <tr key={b.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4 font-medium text-slate-900">{b.customers?.name ?? "—"}</td>
-                    <td className="p-4 text-slate-600">{b.description}</td>
-                    <td className="p-4 font-medium text-slate-900">{formatAmount(b.amount_cents)}</td>
-                    <td className="p-4 text-slate-600">{b.due_date}</td>
-                    <td className="p-4">
-                      <span
-                        className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          b.status === "paid"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : b.status === "overdue"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-slate-100 text-slate-700"
-                        }`}
-                      >
-                        {b.status}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      {b.status === "paid" ? (
-                        <span className="text-slate-400 text-sm">—</span>
-                      ) : (
-                        <button
-                          onClick={() => handleGetLink(b)}
-                          disabled={loadingLink === b.id}
-                          className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 font-medium disabled:opacity-50 transition-colors"
-                        >
-                          {loadingLink === b.id
-                            ? "…"
-                            : copied === b.id
-                            ? "Copied!"
-                            : b.payment_link
-                            ? "Copy link"
-                            : "Get link"}
-                        </button>
-                      )}
-                    </td>
+          <>
+            <div className="bills-toolbar">
+              {bucketFilter !== "paid" && (
+                <label className="bills-filter">
+                  <span>Aging:</span>
+                  <select
+                    value={bucketFilter}
+                    onChange={(e) => handleBucketChange(e.target.value)}
+                    className="bills-select"
+                  >
+                    {BUCKET_OPTIONS.filter((o) => o.value !== "paid").map((opt) => (
+                      <option key={opt.value || "all"} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <span className="bills-count">
+                {filtered.length} bill{filtered.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            <div className="bills-table-wrap">
+              <table className="bills-table">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                    <th>Payment</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {paginated.map((b) => {
+                    const isPaid = b.balance_cents === 0 || b.status === "paid";
+                    return (
+                    <tr key={b.id} className={isPaid ? "bills-row-paid" : ""}>
+                      <td className="bills-cell-customer">{b.customers?.name ?? "—"}</td>
+                      <td>{b.description || "Invoice"}</td>
+                      <td className={`bills-cell-amount ${isPaid ? "bills-cell-amount-paid" : ""}`}>{formatAmount(b.amount_cents)}</td>
+                      <td>{b.due_date}</td>
+                      <td>
+                        <span className={`bills-status bills-status-${b.status}`}>
+                          {b.status}
+                        </span>
+                      </td>
+                      <td>
+                        {b.status === "paid" ? (
+                          <span className="bills-muted">—</span>
+                        ) : (
+                          <button
+                            onClick={() => handleGetLink(b)}
+                            disabled={loadingLink === b.id}
+                            className="bills-btn-link"
+                          >
+                            {loadingLink === b.id ? "…" : copied === b.id ? "Copied!" : b.payment_link ? "Copy link" : "Get link"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );})}
+                </tbody>
+              </table>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="bills-pagination">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage <= 1}
+                  className="bills-page-btn"
+                >
+                  ← Previous
+                </button>
+                <span className="bills-page-info">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage >= totalPages}
+                  className="bills-page-btn"
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>
+  );
+}
+
+export default function BillsPage() {
+  return (
+    <Suspense fallback={<main className="bills-page"><div className="bills-container"><p className="bills-loading">Loading...</p></div></main>}>
+      <BillsPageContent />
+    </Suspense>
   );
 }
