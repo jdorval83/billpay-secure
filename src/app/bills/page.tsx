@@ -48,59 +48,64 @@ export default function BillsPage() {
   const formatAmount = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-5xl mx-auto">
+    <main className="min-h-screen bg-slate-50/50">
+      <div className="max-w-5xl mx-auto px-6 py-10">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold">Bills</h1>
-          <Link href="/bills/new" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          <h1 className="text-2xl font-bold text-slate-900">Bills</h1>
+          <Link href="/bills/new" className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium transition-colors">
             New Bill
           </Link>
         </div>
         {loading ? (
-          <p>Loading...</p>
+          <p className="text-slate-500">Loading...</p>
         ) : bills.length === 0 ? (
-          <p className="text-gray-500">No bills yet. Create one to get started.</p>
+          <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
+            <p className="text-slate-500 mb-4">No bills yet. Create one to get started.</p>
+            <Link href="/bills/new" className="text-emerald-600 font-medium hover:text-emerald-700">
+              Create your first bill →
+            </Link>
+          </div>
         ) : (
-          <div className="bg-white border rounded shadow-sm overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50 border-b">
-                  <th className="text-left p-3">Customer</th>
-                  <th className="text-left p-3">Description</th>
-                  <th className="text-left p-3">Amount</th>
-                  <th className="text-left p-3">Due Date</th>
-                  <th className="text-left p-3">Status</th>
-                  <th className="text-left p-3">Payment</th>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left p-4 text-slate-600 font-medium">Customer</th>
+                  <th className="text-left p-4 text-slate-600 font-medium">Description</th>
+                  <th className="text-left p-4 text-slate-600 font-medium">Amount</th>
+                  <th className="text-left p-4 text-slate-600 font-medium">Due Date</th>
+                  <th className="text-left p-4 text-slate-600 font-medium">Status</th>
+                  <th className="text-left p-4 text-slate-600 font-medium">Payment</th>
                 </tr>
               </thead>
               <tbody>
                 {bills.map((b) => (
-                  <tr key={b.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3">{b.customers?.name ?? "—"}</td>
-                    <td className="p-3">{b.description}</td>
-                    <td className="p-3">{formatAmount(b.amount_cents)}</td>
-                    <td className="p-3">{b.due_date}</td>
-                    <td className="p-3">
+                  <tr key={b.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                    <td className="p-4 font-medium text-slate-900">{b.customers?.name ?? "—"}</td>
+                    <td className="p-4 text-slate-600">{b.description}</td>
+                    <td className="p-4 font-medium text-slate-900">{formatAmount(b.amount_cents)}</td>
+                    <td className="p-4 text-slate-600">{b.due_date}</td>
+                    <td className="p-4">
                       <span
-                        className={`px-2 py-0.5 rounded text-sm ${
+                        className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           b.status === "paid"
-                            ? "bg-green-100 text-green-800"
+                            ? "bg-emerald-100 text-emerald-800"
                             : b.status === "overdue"
                             ? "bg-red-100 text-red-800"
-                            : "bg-gray-100 text-gray-800"
+                            : "bg-slate-100 text-slate-700"
                         }`}
                       >
                         {b.status}
                       </span>
                     </td>
-                    <td className="p-3">
+                    <td className="p-4">
                       {b.status === "paid" ? (
-                        <span className="text-gray-400 text-sm">—</span>
+                        <span className="text-slate-400 text-sm">—</span>
                       ) : (
                         <button
                           onClick={() => handleGetLink(b)}
                           disabled={loadingLink === b.id}
-                          className="text-sm px-2 py-1 rounded border hover:bg-gray-50 disabled:opacity-50"
+                          className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 font-medium disabled:opacity-50 transition-colors"
                         >
                           {loadingLink === b.id
                             ? "…"

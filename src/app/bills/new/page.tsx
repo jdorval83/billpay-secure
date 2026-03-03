@@ -57,85 +57,89 @@ export default function NewBillPage() {
   };
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-md mx-auto">
-        <h1 className="text-2xl font-bold mb-6">New Bill</h1>
+    <main className="min-h-screen bg-slate-50/50">
+      <div className="max-w-md mx-auto px-6 py-10">
+        <h1 className="text-2xl font-bold text-slate-900 mb-6">New Bill</h1>
         {customers.length === 0 ? (
-          <p className="text-gray-600 mb-4">
-            You need at least one customer before creating a bill.{" "}
-            <Link href="/customers/new" className="text-blue-600 hover:underline">
-              Add a customer
+          <div className="bg-white border border-slate-200 rounded-xl p-8">
+            <p className="text-slate-600 mb-4">
+              You need at least one customer before creating a bill.
+            </p>
+            <Link href="/customers/new" className="text-emerald-600 font-medium hover:text-emerald-700">
+              Add a customer →
             </Link>
-          </p>
+          </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <p className="text-red-600 text-sm">{error}</p>}
-            <div>
-              <label className="block text-sm font-medium mb-1">Customer *</label>
-              <select
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full border rounded px-3 py-2"
-                required
-              >
-                <option value="">Select customer</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Amount ($) *</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full border rounded px-3 py-2"
-                placeholder="0.00"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Description</label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full border rounded px-3 py-2"
-                placeholder="Invoice"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Due Date *</label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full border rounded px-3 py-2"
-                required
-              />
-            </div>
-            <div className="flex gap-3">
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-              >
-                {loading ? "Creating..." : "Create Bill"}
-              </button>
-              <button
-                type="button"
-                onClick={() => router.back()}
-                className="px-4 py-2 border rounded hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && <p className="text-red-600 text-sm">{error}</p>}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Customer *</label>
+                <select
+                  value={customerId}
+                  onChange={(e) => setCustomerId(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  required
+                >
+                  <option value="">Select customer</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Amount ($) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="Invoice"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Due Date *</label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  required
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-5 py-2.5 bg-emerald-500 text-white font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+                >
+                  {loading ? "Creating..." : "Create Bill"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="px-5 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         )}
       </div>
     </main>

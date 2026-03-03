@@ -37,38 +37,58 @@ export default function NewCustomerPage() {
   };
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-md mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Add Customer</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <p className="text-red-600 text-sm">{error}</p>}
-          <div>
-            <label className="block text-sm font-medium mb-1">Name *</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border rounded px-3 py-2" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Phone</label>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border rounded px-3 py-2" />
-          </div>
-          <div className="flex gap-3">
-            <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
-              {loading ? "Saving..." : "Add Customer"}
-            </button>
-            <button type="button" onClick={() => router.back()} className="px-4 py-2 border rounded hover:bg-gray-50">
-              Cancel
-            </button>
-          </div>
-        </form>
+    <main className="min-h-screen bg-slate-50/50">
+      <div className="max-w-md mx-auto px-6 py-10">
+        <h1 className="text-2xl font-bold text-slate-900 mb-6">Add Customer</h1>
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <p className="text-red-600 text-sm">{error}</p>}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-5 py-2.5 bg-emerald-500 text-white font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+              >
+                {loading ? "Saving..." : "Add Customer"}
+              </button>
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="px-5 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 font-medium transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </main>
   );

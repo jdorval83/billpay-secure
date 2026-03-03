@@ -7,16 +7,16 @@ export default function CompanyPage() {
   const businessName = process.env.NEXT_PUBLIC_BUSINESS_NAME || "BillPay Secure";
 
   return (
-    <main className="min-h-screen p-12 bg-gray-50">
-      <div className="max-w-2xl mx-auto text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">{businessName}</h1>
-        <p className="text-lg text-gray-600 mb-8">
-          Billing and accounts receivable management for service businesses.
+    <main className="min-h-screen bg-slate-50/50">
+      <div className="max-w-2xl mx-auto px-6 py-16 text-center">
+        <h1 className="text-3xl font-bold text-slate-900 mb-4">{businessName}</h1>
+        <p className="text-lg text-slate-600 mb-8">
+          Secure billing and payment management for service businesses.
         </p>
-        <p className="text-gray-500 text-sm">
-          We help businesses track invoices, send payment links, and follow up on outstanding balances.
+        <p className="text-slate-500 mb-8">
+          We help businesses track customers, create invoices, send payment links via Stripe, and follow up on outstanding balances.
         </p>
-        <p className="text-gray-400 text-sm mt-8">
+        <p className="text-slate-400 text-sm">
           {businessName} • Billing & AR Services
         </p>
       </div>
