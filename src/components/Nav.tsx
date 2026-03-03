@@ -7,7 +7,7 @@ export default function Nav() {
     <nav className="border-b bg-white mb-8">
       <div className="max-w-4xl mx-auto px-8 py-4 flex gap-4">
         <Link href="/" className="font-bold text-lg text-gray-900 hover:text-gray-600">
-          AR Billing
+          BillPay Secure
         </Link>
         <Link href="/dashboard" className="px-3 py-2 rounded hover:bg-gray-100">
           Dashboard

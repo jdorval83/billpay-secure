@@ -3,8 +3,8 @@ import "./globals.css";
 import Nav from "@/components/Nav";
 
 export const metadata: Metadata = {
-  title: "AR Billing",
-  description: "Billing and AR follow-up for service businesses",
+  title: "BillPay Secure",
+  description: "Secure billing and payment management for service businesses",
 };
 
 export default function RootLayout({

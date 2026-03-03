@@ -1,10 +1,10 @@
 export const metadata = {
-  title: "Company | AR Billing",
+  title: "Company | BillPay Secure",
   description: "Billing and accounts receivable management for service businesses",
 };
 
 export default function CompanyPage() {
-  const businessName = process.env.NEXT_PUBLIC_BUSINESS_NAME || "AR Billing";
+  const businessName = process.env.NEXT_PUBLIC_BUSINESS_NAME || "BillPay Secure";
 
   return (
     <main className="min-h-screen p-12 bg-gray-50">

@@ -1,6 +1,6 @@
-# AR Billing — Project Notes & Recovery Guide
+# BillPay Secure — Project Notes & Recovery Guide
 
-**Project path:** `C:\Users\josep\ar-billing`  
+**Project path:** `C:\Users\josep\ar-billing` • **Production URL:** https://billpaysecure.com  
 **Stack:** Next.js 14, React 18, TypeScript, Tailwind CSS, Supabase, Stripe  
 **Last updated:** March 3, 2025
 
@@ -44,7 +44,7 @@ Open http://localhost:3000
 ## File Structure
 
 ```
-ar-billing/
+billpay-secure/
 ├── .env.local
 ├── package.json
 ├── tsconfig.json
@@ -91,8 +91,8 @@ ar-billing/
 
 1. **Keys:** Dashboard → Developers → API keys. Copy secret key to `STRIPE_SECRET_KEY`.
 2. **Webhook (local):** Run `stripe listen --forward-to localhost:3000/api/webhooks/stripe` — it prints a `whsec_...` secret. Add to `STRIPE_WEBHOOK_SECRET`.
-3. **Webhook (production):** Dashboard → Developers → Webhooks → Add endpoint `https://yourdomain.com/api/webhooks/stripe`, event `checkout.session.completed`. Copy signing secret to `STRIPE_WEBHOOK_SECRET`.
-4. **Business verification:** Stripe may require a public website. Deploy the app, then use `https://yourdomain.com/company` as the website URL. Set `NEXT_PUBLIC_BUSINESS_NAME` in `.env` to exactly match the business name in your Stripe account.
+3. **Webhook (production):** Dashboard → Developers → Webhooks → Add endpoint `https://billpaysecure.com/api/webhooks/stripe`, event `checkout.session.completed`. Copy signing secret to `STRIPE_WEBHOOK_SECRET`.
+4. **Business verification:** Use `https://billpaysecure.com/company` as the website URL in Stripe. `NEXT_PUBLIC_BUSINESS_NAME` must be "BillPay Secure" to match.
 
 ---
 
