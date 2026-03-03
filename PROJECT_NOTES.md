@@ -21,18 +21,23 @@ Open http://localhost:3000
 ## What’s Built (Current State)
 
 ### ✅ Done
-- **Home page** (`/`) — Nav to Dashboard, Customers, Bills, New Bill
+- **Shared nav** — All pages: Dashboard, Customers, Bills, New Bill
+- **Home page** (`/`) — Landing with nav
+- **Dashboard** (`/dashboard`) — Customer count, bill count, total AR (unpaid)
 - **Customers list** (`/customers`) — Lists all customers from Supabase
-- **Add customer** (`/customers/new`) — Form: name (required), email, phone → saves to Supabase
-- **API** — `GET/POST /api/customers` — Reads/writes to `customers` table
-- **Supabase client** — `src/lib/supabase.ts` — Types: `Customer`, `Bill`
-- **Stripe client** — `src/lib/stripe.ts` — Initialized, ready for billing
+- **Add customer** (`/customers/new`) — Form: name (required), email, phone
+- **Bills list** (`/bills`) — List bills with customer, amount, due date, status
+- **New bill** (`/bills/new`) — Create bill: select customer, amount, description, due date
+- **API** — `GET/POST /api/customers`, `GET/POST /api/bills`
+- **Supabase** — `customers` and `bills` tables
+- **Stripe payment links** — "Get link" / "Copy link" on bills → creates Stripe Payment Link, copies to clipboard
+- **Stripe webhook** — Marks bill paid when customer completes payment
+- **Company page** (`/company`) — Public business page for Stripe verification (no auth)
 
-### ⚠️ Links That 404 (Not Built Yet)
-- `/dashboard`
-- `/bills`
-- `/bills/new`
-- `/customers/import`
+### ⚠️ Not Built Yet
+- `/customers/import` — CSV import
+- Edit/delete customer
+- Twilio — calling for AR follow-up
 
 ---
 
@@ -40,24 +45,32 @@ Open http://localhost:3000
 
 ```
 ar-billing/
-├── .env.local          # Supabase + Stripe keys (DO NOT COMMIT)
+├── .env.local
 ├── package.json
 ├── tsconfig.json
-├── next-env.d.ts
+├── supabase/migrations/001_create_bills.sql   # Run in Supabase SQL Editor
 ├── src/
 │   ├── app/
-│   │   ├── api/customers/route.ts   # GET/POST customers
+│   │   ├── api/
+│   │   │   ├── customers/route.ts
+│   │   │   ├── bills/route.ts
+│   │   │   └── bills/[id]/payment-link/route.ts
+│   │   ├── webhooks/stripe/route.ts
+│   │   ├── bills/
+│   │   │   ├── page.tsx
+│   │   │   └── new/page.tsx
 │   │   ├── customers/
-│   │   │   ├── page.tsx             # Customer list
-│   │   │   └── new/page.tsx         # Add customer form
+│   │   │   ├── page.tsx
+│   │   │   └── new/page.tsx
+│   │   ├── dashboard/page.tsx
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   ├── not-found.tsx
-│   │   └── page.tsx                 # Home with nav
+│   │   └── page.tsx
+│   ├── components/Nav.tsx
 │   └── lib/
-│       ├── supabase.ts              # Supabase client + Customer, Bill types
-│       └── stripe.ts                # Stripe client
-└── supabase/           # (empty)
+│       ├── stripe.ts
+│       └── supabase.ts
 ```
 
 ---
@@ -69,10 +82,17 @@ ar-billing/
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role (server-only) |
-| `STRIPE_SECRET_KEY` | Stripe secret key |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook secret |
+| `STRIPE_SECRET_KEY` | Stripe secret key (from dashboard.stripe.com) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook secret (see Stripe setup below) |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key |
 | `NEXT_PUBLIC_APP_URL` | App URL (e.g. http://localhost:3000) |
+
+### Stripe Setup
+
+1. **Keys:** Dashboard → Developers → API keys. Copy secret key to `STRIPE_SECRET_KEY`.
+2. **Webhook (local):** Run `stripe listen --forward-to localhost:3000/api/webhooks/stripe` — it prints a `whsec_...` secret. Add to `STRIPE_WEBHOOK_SECRET`.
+3. **Webhook (production):** Dashboard → Developers → Webhooks → Add endpoint `https://yourdomain.com/api/webhooks/stripe`, event `checkout.session.completed`. Copy signing secret to `STRIPE_WEBHOOK_SECRET`.
+4. **Business verification:** Stripe may require a public website. Deploy the app, then use `https://yourdomain.com/company` as the website URL. Set `NEXT_PUBLIC_BUSINESS_NAME` in `.env` to exactly match the business name in your Stripe account.
 
 ---
 
@@ -86,19 +106,16 @@ ar-billing/
 - `phone` (text, nullable)
 - `created_at` (timestamp)
 
-**Table: `bills`** (for future)
-- `id`, `business_id`, `customer_id`, `amount_cents`, `balance_cents`, `description`, `due_date`, `status`, `stripe_checkout_session_id`, `payment_link`, `sent_at`, `paid_at`, `created_at`
+**Table: `bills`** — Run `supabase/migrations/001_create_bills.sql` in Supabase SQL Editor if not created yet.
+- `id`, `business_id`, `customer_id`, `amount_cents`, `balance_cents`, `description`, `due_date`, `status` (draft/sent/paid/overdue), etc.
 
 ---
 
 ## Suggested Next Steps
 
-1. **Dashboard** — `/dashboard` — Summary (e.g. total AR, recent bills)
-2. **Bills list** — `/bills` — List bills with customer, amount, status
-3. **New bill** — `/bills/new` — Create bill, link to customer, send Stripe payment link
-4. **Customer import** — `/customers/import` — CSV import
-5. **Edit/delete customer** — Edit form, delete action
-6. **Stripe webhooks** — Handle payment success
+1. **Twilio** — Calling for AR follow-up (click-to-call, outbound)
+2. **Customer import** — `/customers/import` — CSV import
+3. **Edit/delete customer** — Edit form, delete action
 
 ---
 
