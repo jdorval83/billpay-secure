@@ -51,7 +51,7 @@ export async function POST(
             unit_amount: bill.amount_cents,
           },
           quantity: 1,
-        },
+        } as { price_data: object; quantity: number },
       ],
       metadata: { bill_id: bill.id },
       after_completion: {
