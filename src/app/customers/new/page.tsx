@@ -37,58 +37,30 @@ export default function NewCustomerPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50/50">
-      <div className="max-w-md mx-auto px-6 py-10">
+    <main className="min-h-screen bg-slate-50">
+      <div className="max-w-md mx-auto px-4 sm:px-6 py-8">
         <h1 className="text-2xl font-bold text-slate-900 mb-6">Add Customer</h1>
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <p className="text-red-600 text-sm">{error}</p>}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              />
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-5 py-2.5 bg-emerald-500 text-white font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors"
-              >
-                {loading ? "Saving..." : "Add Customer"}
-              </button>
-              <button
-                type="button"
-                onClick={() => router.back()}
-                className="px-5 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 font-medium transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
+        <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Name *</label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" placeholder="Acme Inc" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" placeholder="contact@acme.com" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone</label>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" placeholder="(555) 123-4567" />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="submit" disabled={loading} className="px-4 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-60 transition-colors">
+              {loading ? "Saving…" : "Add Customer"}
+            </button>
+            <button type="button" onClick={() => router.back()} className="px-4 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 font-medium text-slate-700 transition-colors">Cancel</button>
+          </div>
+        </form>
       </div>
     </main>
   );

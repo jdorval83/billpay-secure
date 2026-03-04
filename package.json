@@ -1,14 +1,15 @@
 {
-  "name": "billpay-secure",
+  "name": "ar-billing",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "cross-env NODE_OPTIONS=--max-old-space-size=4096 next dev",
-    "build": "cross-env NODE_OPTIONS=--max-old-space-size=4096 next build",
+    "dev": "next dev",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.45.0",
     "next": "14.2.18",
     "react": "^18.3.1",
@@ -16,7 +17,6 @@
     "stripe": "^17.2.0"
   },
   "devDependencies": {
-    "cross-env": "^7.0.3",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

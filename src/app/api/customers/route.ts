@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-
-const BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET() {
+  const auth = await requireAuth().catch(() => null);
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { data, error } = await supabaseAdmin
     .from("customers")
     .select("*")
-    .eq("business_id", BUSINESS_ID)
+    .eq("business_id", auth.businessId)
     .order("name");
 
   if (error) {
@@ -17,6 +18,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAuth().catch(() => null);
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = await request.json();
     const { name, email, phone } = body;
@@ -27,7 +30,7 @@ export async function POST(request: Request) {
     const { data, error } = await supabaseAdmin
     .from("customers")
     .insert({
-      business_id: BUSINESS_ID,
+      business_id: auth.businessId,
       name: name.trim(),
       email: email && String(email).trim() ? String(email).trim() : null,
       phone: phone && String(phone).trim() ? String(phone).trim() : null,
