@@ -53,7 +53,7 @@ export async function GET(
     const { data: billsData, error: billsError } = await supabaseAdmin
       .from("bills")
       .select("*, customers(name, email, phone)")
-      .eq("business_id", BUSINESS_ID)
+      .eq("business_id", businessId)
       .in("id", billIds);
     if (billsError) {
       return NextResponse.json({ error: billsError.message }, { status: 500 });
