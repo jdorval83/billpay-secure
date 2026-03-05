@@ -82,6 +82,7 @@ export default function DashboardPage() {
       "31-60": [],
       "61-90": [],
       "90+": [],
+      Paid: [],
     };
     billsWithMeta.forEach((b) => bucketBillsByKey[b.bucket].push(b));
     return {
