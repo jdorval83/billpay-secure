@@ -11,9 +11,7 @@ if (!stripeSecretKey) {
   throw new Error("STRIPE_SECRET_KEY is not set");
 }
 
-const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2023-10-16",
-});
+const stripe = new Stripe(stripeSecretKey);
 
 export async function GET(
   _request: Request,
