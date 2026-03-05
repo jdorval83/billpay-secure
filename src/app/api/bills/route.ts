@@ -46,6 +46,7 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const businessId = await getBusinessIdForRequest(request);
     const body = await request.json().catch(() => ({}));
     const ids: string[] = Array.isArray(body?.ids) ? body.ids : [];
     if (!ids.length) {
@@ -55,7 +56,7 @@ export async function DELETE(request: Request) {
     const { error } = await supabaseAdmin
       .from("bills")
       .delete()
-      .eq("business_id", BUSINESS_ID)
+      .eq("business_id", businessId)
       .in("id", ids);
 
     if (error) {
