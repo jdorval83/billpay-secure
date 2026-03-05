@@ -40,7 +40,7 @@ export async function PATCH(
 
   const { data: bill, error: fetchError } = await supabaseAdmin
     .from("bills")
-    .select("id, status, business_id")
+    .select("id, status, business_id, first_sent_at")
     .eq("business_id", businessId)
     .eq("id", id)
     .single();
