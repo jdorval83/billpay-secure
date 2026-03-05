@@ -1,23 +1,22 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { requireAuth } from "@/lib/auth";
+import { getBusinessIdForRequest } from "@/lib/tenant";
 
-export async function GET() {
-  const auth = await requireAuth().catch(() => null);
-  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(request: Request) {
+  const businessId = await getBusinessIdForRequest(request);
   const { data, error } = await supabaseAdmin
     .from("bills")
     .select("*, customers(name, email, phone)")
-    .eq("business_id", auth.businessId)
+    .eq("business_id", businessId)
     .order("due_date", { ascending: false });
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ bills: data });
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAuth().catch(() => null);
-  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
+    const businessId = await getBusinessIdForRequest(request);
     const body = await request.json();
     const { customer_id, amount_cents, description, due_date } = body;
     if (!customer_id || typeof customer_id !== "string") {
@@ -28,7 +27,7 @@ export async function POST(request: Request) {
     const { data, error } = await supabaseAdmin
       .from("bills")
       .insert({
-        business_id: auth.businessId,
+        business_id: businessId,
         customer_id: customer_id.trim(),
         amount_cents: amount,
         balance_cents: amount,
@@ -41,6 +40,30 @@ export async function POST(request: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ bill: data });
   } catch (err) {
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const ids: string[] = Array.isArray(body?.ids) ? body.ids : [];
+    if (!ids.length) {
+      return NextResponse.json({ error: "ids array is required" }, { status: 400 });
+    }
+
+    const { error } = await supabaseAdmin
+      .from("bills")
+      .delete()
+      .eq("business_id", BUSINESS_ID)
+      .in("id", ids);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

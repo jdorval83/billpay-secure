@@ -5,16 +5,17 @@
 :root {
   --foreground: #0f172a;
   --background: #f8fafc;
-  --card-bg: #ffffff;
-  --border: #e2e8f0;
-  --accent: #059669;
-  --accent-hover: #047857;
-  --muted: #64748b;
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
+@layer base {
+  body {
+    color: var(--foreground);
+    background:
+      radial-gradient(circle at top left, rgba(16, 185, 129, 0.05), transparent 50%),
+      radial-gradient(circle at bottom right, rgba(15, 23, 42, 0.04), transparent 50%),
+      var(--background);
+  }
+  h1, h2, h3 { @apply text-slate-900 tracking-tight; }
 }
 
 @layer components {
@@ -25,18 +26,18 @@ body {
     @apply card transition-shadow duration-200 hover:shadow-md hover:shadow-slate-300/30;
   }
   .btn-primary {
-    @apply px-4 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 
-           transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed 
+    @apply px-4 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700
+           transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed
            focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2;
   }
   .btn-secondary {
     @apply px-4 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400
-           transition-colors duration-150 font-medium text-slate-700 focus:outline-none focus:ring-2 
+           transition-colors duration-150 font-medium text-slate-700 focus:outline-none focus:ring-2
            focus:ring-slate-400 focus:ring-offset-2;
   }
   .input {
-    @apply w-full border border-slate-300 rounded-lg px-4 py-2.5 text-slate-900 
-           placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 
+    @apply w-full border border-slate-300 rounded-lg px-4 py-2.5 text-slate-900
+           placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500
            focus:border-emerald-500 transition-shadow duration-150;
   }
   .label {

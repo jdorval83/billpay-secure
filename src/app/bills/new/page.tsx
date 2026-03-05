@@ -21,16 +21,27 @@ export default function NewBillPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerId) { setError("Select a customer"); return; }
+    if (!customerId) {
+      setError("Select a customer");
+      return;
+    }
     const amountCents = Math.round(parseFloat(amount || "0") * 100);
-    if (amountCents <= 0) { setError("Amount must be > 0"); return; }
+    if (amountCents <= 0) {
+      setError("Amount must be > 0");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
       const res = await fetch("/api/bills", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customer_id: customerId, amount_cents: amountCents, description: description.trim() || "Invoice", due_date: dueDate }),
+        body: JSON.stringify({
+          customer_id: customerId,
+          amount_cents: amountCents,
+          description: description.trim() || "Invoice",
+          due_date: dueDate,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
@@ -45,11 +56,11 @@ export default function NewBillPage() {
 
   if (customers.length === 0) {
     return (
-      <main className="min-h-screen bg-slate-50">
-        <div className="max-w-md mx-auto px-4 sm:px-6 py-8">
-          <div className="bg-white rounded-xl border border-slate-200 p-8">
+      <main className="page-container">
+        <div className="content-max max-w-md">
+          <div className="card p-8">
             <p className="text-slate-600 mb-4">Add at least one customer first.</p>
-            <Link href="/customers/new" className="inline-block px-4 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors">Add customer</Link>
+            <Link href="/customers/new" className="btn-primary inline-block">Add customer</Link>
           </div>
         </div>
       </main>
@@ -57,33 +68,35 @@ export default function NewBillPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="max-w-md mx-auto px-4 sm:px-6 py-8">
+    <main className="page-container">
+      <div className="content-max max-w-md">
         <h1 className="text-2xl font-bold text-slate-900 mb-6">New Bill</h1>
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="card p-6 space-y-4">
           {error && <p className="text-red-600 text-sm">{error}</p>}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Customer *</label>
-            <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" required>
+            <label className="label">Customer *</label>
+            <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="input" required>
               <option value="">Select customer</option>
-              {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Amount ($) *</label>
-            <input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" placeholder="0.00" required />
+            <label className="label">Amount ($) *</label>
+            <input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="input" placeholder="0.00" required />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
-            <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" placeholder="Invoice" />
+            <label className="label">Description</label>
+            <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} className="input" placeholder="Invoice" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Due Date *</label>
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" required />
+            <label className="label">Due Date *</label>
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input" required />
           </div>
           <div className="flex gap-3 pt-2">
-            <button type="submit" disabled={loading} className="px-4 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-60 transition-colors">{loading ? "Creating…" : "Create Bill"}</button>
-            <Link href="/bills" className="px-4 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 font-medium text-slate-700 transition-colors inline-block">Cancel</Link>
+            <button type="submit" disabled={loading} className="btn-primary">{loading ? "Creating…" : "Create Bill"}</button>
+            <Link href="/bills" className="btn-secondary">Cancel</Link>
           </div>
         </form>
       </div>
