@@ -70,7 +70,7 @@ export default function NewBillPage() {
   return (
     <main className="page-container">
       <div className="content-max max-w-md">
-        <h1 className="text-2xl font-bold text-slate-900 mb-6">New Bill</h1>
+        <h1 className="text-2xl font-bold text-slate-900 mb-6">New charge</h1>
         <form onSubmit={handleSubmit} className="card p-6 space-y-4">
           {error && <p className="text-red-600 text-sm">{error}</p>}
           <div>
@@ -95,7 +95,7 @@ export default function NewBillPage() {
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input" required />
           </div>
           <div className="flex gap-3 pt-2">
-            <button type="submit" disabled={loading} className="btn-primary">{loading ? "Creating…" : "Create Bill"}</button>
+            <button type="submit" disabled={loading} className="btn-primary">{loading ? "Creating…" : "Create charge"}</button>
             <Link href="/bills" className="btn-secondary">Cancel</Link>
           </div>
         </form>

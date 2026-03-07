@@ -2,6 +2,16 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+  CartesianGrid,
+} from "recharts";
 
 type Customer = { id: string };
 type Bill = {
@@ -14,29 +24,43 @@ type Bill = {
   status: string;
   customers?: { name?: string | null } | null;
 };
-type BucketKey = "Current" | "1-30" | "31-60" | "61-90" | "90+" | "Paid";
-type SortKey = "age" | "due_date" | "amount" | "name";
+type DashboardStats = {
+  totalCharges: number;
+  totalPayments: number;
+  totalOutstanding: number;
+  byMonth: { month: string; charges: number; payments: number }[];
+  aging: { bucket: string; amountCents: number }[];
+};
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
-  const [selectedBucket, setSelectedBucket] = useState<BucketKey>("Current");
-  const [sortKey, setSortKey] = useState<SortKey>("age");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [creatingInvoice, setCreatingInvoice] = useState(false);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
-  const sectionRef = useRef<HTMLElement>(null);
+  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
+  const [recordPaymentSubmitting, setRecordPaymentSubmitting] = useState(false);
+  const [recordPaymentForm, setRecordPaymentForm] = useState({
+    amount: "",
+    check_number: "",
+    payer_name: "",
+    paid_at: new Date().toISOString().slice(0, 10),
+    notes: "",
+    bill_ids: [] as string[],
+    file: null as File | null,
+  });
+  const recordPaymentRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     setLoading(true);
     Promise.all([
       fetch("/api/customers").then((r) => r.json()),
       fetch("/api/bills").then((r) => r.json()).catch(() => ({ bills: [] })),
-    ]).then(([cRes, bRes]) => {
+      fetch("/api/dashboard/stats").then((r) => r.json()).catch(() => null),
+    ]).then(([cRes, bRes, statsRes]) => {
       setCustomers(cRes.customers || []);
       setBills(bRes.bills || []);
+      setStats(statsRes && !statsRes.error ? statsRes : null);
       setLoading(false);
     });
   }, []);
@@ -44,124 +68,78 @@ export default function DashboardPage() {
   const formatMoney = (cents: number) =>
     "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
 
-  const { unpaid, paid, totalAR, bucketSummaries, bucketBillsSorted } = useMemo(() => {
-    const today = new Date();
-    const parseDate = (value: string) => new Date(value + "T00:00:00");
-    const getDaysPastDue = (due: string) => {
-      const diffMs = today.getTime() - parseDate(due).getTime();
-      return Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    };
-    const getBucket = (bill: Bill): BucketKey => {
-      const days = getDaysPastDue(bill.due_date);
-      if (days <= 0) return "Current";
-      if (days <= 30) return "1-30";
-      if (days <= 60) return "31-60";
-      if (days <= 90) return "61-90";
-      return "90+";
-    };
+  const { unpaid, paid, totalAR } = useMemo(() => {
     const unpaidBills = bills.filter((b) => b.balance_cents > 0);
     const paidBills = bills.filter((b) => b.balance_cents <= 0 || b.status === "paid");
     const total = unpaidBills.reduce((sum, b) => sum + b.balance_cents, 0);
-    const bucketOrder: BucketKey[] = ["Current", "1-30", "31-60", "61-90", "90+"];
-    const billsWithMeta = unpaidBills.map((b) => ({
-      ...b,
-      daysPastDue: getDaysPastDue(b.due_date),
-      bucket: getBucket(b),
-    }));
-    const summaries = bucketOrder.map((bucket) => {
-      const bucketBills = billsWithMeta.filter((b) => b.bucket === bucket);
-      return {
-        bucket,
-        count: bucketBills.length,
-        totalCents: bucketBills.reduce((s, b) => s + b.balance_cents, 0),
-      };
-    });
-    const bucketBillsByKey: Record<BucketKey, typeof billsWithMeta> = {
-      Current: [],
-      "1-30": [],
-      "31-60": [],
-      "61-90": [],
-      "90+": [],
-      Paid: [],
-    };
-    billsWithMeta.forEach((b) => bucketBillsByKey[b.bucket].push(b));
     return {
       unpaid: unpaidBills,
       paid: paidBills,
       totalAR: total,
-      bucketSummaries: summaries,
-      bucketBillsSorted: bucketBillsByKey,
     };
   }, [bills]);
 
-  const visibleBucketBillsRaw = bucketBillsSorted[selectedBucket] || [];
-  const sortedBucketBills = useMemo(() => {
-    const copy = [...visibleBucketBillsRaw];
-    copy.sort((a, b) => {
-      const dir = sortDir === "asc" ? 1 : -1;
-      if (sortKey === "age") return (a.daysPastDue - b.daysPastDue) * dir;
-      if (sortKey === "due_date") return a.due_date.localeCompare(b.due_date) * dir;
-      if (sortKey === "amount") return (a.amount_cents - b.amount_cents) * dir;
-      const aName = (a.customers as { name?: string })?.name ?? "";
-      const bName = (b.customers as { name?: string })?.name ?? "";
-      return aName.localeCompare(bName) * dir;
-    });
-    return copy;
-  }, [visibleBucketBillsRaw, sortKey, sortDir]);
-
-  const bucketOrder: BucketKey[] = ["Current", "1-30", "31-60", "61-90", "90+"];
-  const handleSort = (key: SortKey) => {
-    setSortDir((prev) => (sortKey === key ? (prev === "asc" ? "desc" : "asc") : "asc"));
-    setSortKey(key);
-  };
-
-  const canSelectForInvoice = (b: Bill & { daysPastDue?: number; bucket?: BucketKey }) => {
-    const s = (b.status || "").toLowerCase();
-    return (s === "draft" || s === "finalized") && b.balance_cents > 0;
-  };
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+  const refreshData = () => {
+    Promise.all([
+      fetch("/api/bills").then((r) => r.json()).catch(() => ({ bills: [] })),
+      fetch("/api/dashboard/stats").then((r) => r.json()).catch(() => null),
+    ]).then(([bRes, statsRes]) => {
+      setBills(bRes.bills || []);
+      setStats(statsRes && !statsRes.error ? statsRes : null);
     });
   };
-  const selectedBills = bills.filter((b) => selectedIds.has(b.id));
-  const sameCustomer = selectedBills.length > 0 && selectedBills.every((b) => b.customer_id === selectedBills[0].customer_id);
-  const canCreateInvoice = selectedBills.length > 0 && sameCustomer;
 
-  const handleCreateInvoice = async () => {
-    if (!canCreateInvoice) return;
-    const customerId = selectedBills[0].customer_id;
-    const billIds = selectedBills.map((b) => b.id);
-    setCreatingInvoice(true);
+  const handleRecordPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amountCents = Math.round(parseFloat(recordPaymentForm.amount || "0") * 100);
+    if (amountCents <= 0) {
+      setMessage({ type: "error", text: "Enter a valid amount." });
+      return;
+    }
+    setRecordPaymentSubmitting(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/invoices", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId, billIds }),
-      });
+      const formData = new FormData();
+      formData.set("amount_cents", String(amountCents));
+      formData.set("check_number", recordPaymentForm.check_number);
+      formData.set("payer_name", recordPaymentForm.payer_name);
+      formData.set("paid_at", recordPaymentForm.paid_at);
+      formData.set("notes", recordPaymentForm.notes);
+      formData.set("bill_ids", JSON.stringify(recordPaymentForm.bill_ids));
+      if (recordPaymentForm.file) formData.set("file", recordPaymentForm.file);
+      const res = await fetch("/api/payment-records", { method: "POST", body: formData });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to create invoice");
-      setMessage({ type: "success", text: "Invoice created. View it on the Invoices page." });
-      setSelectedIds(new Set());
-      Promise.all([
-        fetch("/api/customers").then((r) => r.json()),
-        fetch("/api/bills").then((r) => r.json()).catch(() => ({ bills: [] })),
-      ]).then(([cRes, bRes]) => {
-        setCustomers(cRes.customers || []);
-        setBills(bRes.bills || []);
+      if (!res.ok) throw new Error(data.error || "Failed to record payment");
+      setMessage({
+        type: "success",
+        text: data.billsMarkedPaid
+          ? `Payment recorded. ${data.billsMarkedPaid} charge(s) marked paid.`
+          : "Payment recorded.",
       });
-    } catch (e) {
-      setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to create invoice" });
+      setRecordPaymentOpen(false);
+      setRecordPaymentForm({
+        amount: "",
+        check_number: "",
+        payer_name: "",
+        paid_at: new Date().toISOString().slice(0, 10),
+        notes: "",
+        bill_ids: [],
+        file: null,
+      });
+      refreshData();
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to record payment" });
     } finally {
-      setCreatingInvoice(false);
+      setRecordPaymentSubmitting(false);
     }
   };
 
-  const scrollToSection = () => sectionRef.current?.scrollIntoView({ behavior: "smooth" });
+  const toggleRecordPaymentBill = (id: string) => {
+    setRecordPaymentForm((f) => ({
+      ...f,
+      bill_ids: f.bill_ids.includes(id) ? f.bill_ids.filter((x) => x !== id) : [...f.bill_ids, id],
+    }));
+  };
 
   if (loading) {
     return (
@@ -185,31 +163,185 @@ export default function DashboardPage() {
     <main className="page-container">
       <div className="content-max">
         <h1 className="text-2xl font-bold text-slate-900 mb-6">Dashboard</h1>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <button type="button" onClick={scrollToSection} className="card-hover p-6 text-left w-full">
-            <p className="text-sm font-medium text-slate-600">Total AR</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <Link href="/bills" className="card-hover p-6 block">
+            <p className="text-sm font-medium text-slate-600">Total AR (outstanding)</p>
             <p className="text-2xl font-bold text-slate-900 mt-1">{formatMoney(totalAR)}</p>
-            <p className="text-xs text-slate-500 mt-2">Click to view aging</p>
-          </button>
-          <button type="button" onClick={() => { const first = bucketOrder.find((b) => (bucketSummaries.find((s) => s.bucket === b)?.count ?? 0) > 0); setSelectedBucket(first || "Current"); scrollToSection(); }} className="card-hover p-6 text-left w-full">
-            <p className="text-sm font-medium text-slate-600">Unpaid bills</p>
+            <p className="text-xs text-slate-500 mt-2">View charges</p>
+          </Link>
+          <Link href="/bills" className="card-hover p-6 block">
+            <p className="text-sm font-medium text-slate-600">Unpaid charges</p>
             <p className="text-2xl font-bold text-slate-900 mt-1">{unpaid.length}</p>
-            <p className="text-xs text-slate-500 mt-2">Click to drill in</p>
-          </button>
+            <p className="text-xs text-slate-500 mt-2">View charges</p>
+          </Link>
           <Link href="/customers" className="card-hover p-6 block">
             <p className="text-sm font-medium text-slate-600">Customers</p>
             <p className="text-2xl font-bold text-slate-900 mt-1">{customers.length}</p>
             <p className="text-xs text-slate-500 mt-2">View all customers</p>
           </Link>
-          <button
-            type="button"
-            onClick={() => { setSelectedBucket("Paid"); scrollToSection(); }}
-            className="card-hover p-6 text-left w-full"
-          >
-            <p className="text-sm font-medium text-slate-600">Paid bills</p>
+          <Link href="/bills" className="card-hover p-6 block">
+            <p className="text-sm font-medium text-slate-600">Paid charges</p>
             <p className="text-2xl font-bold text-slate-900 mt-1">{paid.length}</p>
-            <p className="text-xs text-slate-500 mt-2">Click to drill in</p>
-          </button>
+            <p className="text-xs text-slate-500 mt-2">View charges</p>
+          </Link>
+        </div>
+        {stats && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div className="card p-6">
+              <p className="text-sm font-medium text-slate-600">Total charges (all time)</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{formatMoney(stats.totalCharges)}</p>
+            </div>
+            <div className="card p-6">
+              <p className="text-sm font-medium text-slate-600">Total payments received</p>
+              <p className="text-2xl font-bold text-emerald-700 mt-1">{formatMoney(stats.totalPayments)}</p>
+            </div>
+            <div className="card p-6">
+              <p className="text-sm font-medium text-slate-600">Total outstanding</p>
+              <p className="text-2xl font-bold text-amber-700 mt-1">{formatMoney(stats.totalOutstanding)}</p>
+            </div>
+          </div>
+        )}
+        {stats && (stats.aging.some((a) => a.amountCents > 0) || stats.byMonth.some((m) => m.charges > 0 || m.payments > 0)) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div className="card p-6">
+              <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Aging of receivables</h3>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={stats.aging.map((a) => ({ name: a.bucket, amount: a.amountCents / 100, full: a.amountCents }))} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + v} />
+                  <Tooltip formatter={(v: number) => ["$" + v.toFixed(2), "Outstanding"]} />
+                  <Bar dataKey="amount" fill="#10b981" name="Outstanding" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="card p-6">
+              <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Charges vs payments (last 6 months)</h3>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart
+                  data={stats.byMonth.map((m) => ({ month: m.month, charges: m.charges / 100, payments: m.payments / 100 }))}
+                  margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + v} />
+                  <Tooltip formatter={(v: number) => ["$" + v.toFixed(2), ""]} />
+                  <Legend />
+                  <Bar dataKey="charges" fill="#64748b" name="Charges" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="payments" fill="#10b981" name="Payments" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+        <div className="mb-8">
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <h2 className="text-sm font-semibold text-slate-700 tracking-wide uppercase">Record payment (check / cash / other)</h2>
+            {!recordPaymentOpen ? (
+              <button type="button" onClick={() => setRecordPaymentOpen(true)} className="btn-secondary text-sm py-2">
+                Add payment received outside system
+              </button>
+            ) : null}
+          </div>
+          {recordPaymentOpen && (
+            <div className="card p-6">
+              <form ref={recordPaymentRef} onSubmit={handleRecordPayment} className="space-y-4">
+                <p className="text-sm text-slate-600">Record a payment you received by check, cash, or other method. Optionally link to charges to mark them paid and attach a photo of the check (max 500KB).</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Amount ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={recordPaymentForm.amount}
+                      onChange={(e) => setRecordPaymentForm((f) => ({ ...f, amount: e.target.value }))}
+                      className="input"
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Payment date</label>
+                    <input
+                      type="date"
+                      value={recordPaymentForm.paid_at}
+                      onChange={(e) => setRecordPaymentForm((f) => ({ ...f, paid_at: e.target.value }))}
+                      className="input"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Check number (optional)</label>
+                    <input
+                      type="text"
+                      value={recordPaymentForm.check_number}
+                      onChange={(e) => setRecordPaymentForm((f) => ({ ...f, check_number: e.target.value }))}
+                      className="input"
+                      placeholder="e.g. 1234"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Payer name (optional)</label>
+                    <input
+                      type="text"
+                      value={recordPaymentForm.payer_name}
+                      onChange={(e) => setRecordPaymentForm((f) => ({ ...f, payer_name: e.target.value }))}
+                      className="input"
+                      placeholder="Customer or company name"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Notes (optional)</label>
+                  <textarea
+                    value={recordPaymentForm.notes}
+                    onChange={(e) => setRecordPaymentForm((f) => ({ ...f, notes: e.target.value }))}
+                    className="input min-h-[80px]"
+                    placeholder="e.g. Check received in mail, memo note"
+                    rows={2}
+                  />
+                </div>
+                <div>
+                  <label className="label">Photo of check (optional, max 500KB)</label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(e) => setRecordPaymentForm((f) => ({ ...f, file: e.target.files?.[0] ?? null }))}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Mark these charges as paid (optional)</label>
+                  <p className="text-xs text-slate-500 mb-2">Select unpaid charges that this payment covers.</p>
+                  <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2 space-y-1">
+                    {unpaid.length === 0 ? (
+                      <p className="text-sm text-slate-500">No unpaid charges.</p>
+                    ) : (
+                      unpaid.map((b) => (
+                        <label key={b.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={recordPaymentForm.bill_ids.includes(b.id)}
+                            onChange={() => toggleRecordPaymentBill(b.id)}
+                            className="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                          />
+                          <span className="text-sm">{(b.customers as { name?: string })?.name ?? "—"} — {formatMoney(b.balance_cents)} — {b.due_date}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" disabled={recordPaymentSubmitting} className="btn-primary">
+                    {recordPaymentSubmitting ? "Saving…" : "Record payment"}
+                  </button>
+                  <button type="button" onClick={() => setRecordPaymentOpen(false)} className="btn-secondary">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
         {message && (
           <div className={`mb-4 rounded-lg border p-3 text-sm ${message.type === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
@@ -217,121 +349,9 @@ export default function DashboardPage() {
           </div>
         )}
         <div className="flex flex-wrap items-center gap-3 mb-10">
-          {canCreateInvoice && (
-            <button
-              type="button"
-              onClick={handleCreateInvoice}
-              disabled={creatingInvoice}
-              className="btn-primary"
-            >
-              {creatingInvoice ? "Creating…" : `Create invoice (${selectedIds.size} bill${selectedIds.size === 1 ? "" : "s"})`}
-            </button>
-          )}
           <Link href="/customers/new" className="btn-primary">Add Customer</Link>
-          <Link href="/bills/new" className="btn-secondary">New Bill</Link>
+          <Link href="/bills/new" className="btn-secondary">New charge</Link>
         </div>
-        <section ref={sectionRef} className="mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-slate-700 tracking-wide uppercase">Aging buckets</h2>
-            <p className="text-xs text-slate-500">Click a bucket to see accounts; click column headers to sort.</p>
-          </div>
-          <div className="flex flex-wrap gap-3 mb-6">
-            {bucketOrder.map((bucket) => {
-              const summary = bucketSummaries.find((s) => s.bucket === bucket)!;
-              const isActive = selectedBucket === bucket;
-              return (
-                <button
-                  key={bucket}
-                  type="button"
-                  onClick={() => setSelectedBucket(bucket)}
-                  className={`flex flex-col items-start px-4 py-3 rounded-lg border text-left transition-colors ${
-                    isActive ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="text-xs font-semibold uppercase tracking-wide">{bucket} days</span>
-                  <span className="text-sm font-medium">{summary.count} {summary.count === 1 ? "bill" : "bills"}</span>
-                  <span className="text-xs text-slate-500">{summary.totalCents ? formatMoney(summary.totalCents) : "$0.00"}</span>
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => setSelectedBucket("Paid")}
-              className={`flex flex-col items-start px-4 py-3 rounded-lg border text-left transition-colors ${
-                selectedBucket === "Paid" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              <span className="text-xs font-semibold uppercase tracking-wide">Paid</span>
-              <span className="text-sm font-medium">{paid.length} {paid.length === 1 ? "bill" : "bills"}</span>
-              <span className="text-xs text-slate-500">—</span>
-            </button>
-          </div>
-          <div className="card overflow-hidden">
-            {selectedBucket === "Paid" ? (
-              paid.length === 0 ? (
-                <div className="p-6 text-sm text-slate-600">No paid bills yet.</div>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-200 text-left">
-                      <th className="p-3 font-semibold text-slate-700">Customer</th>
-                      <th className="p-3 font-semibold text-slate-700">Description</th>
-                      <th className="p-3 font-semibold text-slate-700">Amount</th>
-                      <th className="p-3 font-semibold text-slate-700">Due date</th>
-                      <th className="p-3 font-semibold text-slate-700">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paid.slice().sort((a, b) => b.due_date.localeCompare(a.due_date)).map((b) => (
-                      <tr key={b.id} className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors">
-                        <td className="p-3 font-medium text-slate-900">{(b.customers as { name?: string })?.name ?? "—"}</td>
-                        <td className="p-3 text-slate-600">{b.description || "Invoice"}</td>
-                        <td className="p-3 font-medium text-slate-900">{formatMoney(b.amount_cents)}</td>
-                        <td className="p-3 text-slate-600">{b.due_date}</td>
-                        <td className="p-3"><span className="text-emerald-600 font-medium">paid</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )
-            ) : sortedBucketBills.length === 0 ? (
-              <div className="p-6 text-sm text-slate-600">No unpaid bills in the <span className="font-semibold">{selectedBucket}</span> bucket.</div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50/80 border-b border-slate-200 text-left">
-                    <th className="w-10 p-3 text-center"><span className="sr-only">Select</span></th>
-                    <th className="p-3 font-semibold text-slate-700 cursor-pointer select-none" onClick={() => handleSort("name")}>Customer</th>
-                    <th className="p-3 font-semibold text-slate-700">Description</th>
-                    <th className="p-3 font-semibold text-slate-700 cursor-pointer select-none" onClick={() => handleSort("due_date")}>Due date</th>
-                    <th className="p-3 font-semibold text-slate-700 cursor-pointer select-none" onClick={() => handleSort("age")}>Age (days)</th>
-                    <th className="p-3 font-semibold text-slate-700 cursor-pointer select-none" onClick={() => handleSort("amount")}>Amount</th>
-                    <th className="p-3 font-semibold text-slate-700">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedBucketBills.map((b) => (
-                    <tr key={b.id} className={`border-b border-slate-100 transition-colors ${selectedIds.has(b.id) ? "bg-emerald-50/50" : "hover:bg-slate-50/60"}`}>
-                      <td className="p-3 text-center">
-                        {canSelectForInvoice(b) ? (
-                          <input type="checkbox" checked={selectedIds.has(b.id)} onChange={() => toggleSelect(b.id)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-                      <td className="p-3 font-medium text-slate-900">{(b.customers as { name?: string })?.name ?? "—"}</td>
-                      <td className="p-3 text-slate-600">{b.description || "Invoice"}</td>
-                      <td className="p-3 text-slate-600">{b.due_date}</td>
-                      <td className="p-3 text-slate-600">{b.daysPastDue}</td>
-                      <td className="p-3 font-medium text-slate-900">{formatMoney(b.amount_cents)}</td>
-                      <td className="p-3"><span className={b.status === "paid" ? "text-emerald-600 font-medium" : "text-amber-600 font-medium"}>{b.status}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </section>
       </div>
     </main>
   );

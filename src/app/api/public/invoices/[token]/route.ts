@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-
-const BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
+import { getBusinessIdForRequest } from "@/lib/tenant";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
+  const businessId = await getBusinessIdForRequest(request);
   const { token } = await params;
   if (!token) {
     return NextResponse.json({ error: "Token required" }, { status: 400 });
@@ -19,7 +19,7 @@ export async function GET(
     supabaseAdmin
       .from("invoices")
       .select("*, customers(name, email, phone)")
-      .eq("business_id", BUSINESS_ID)
+      .eq("business_id", businessId)
       .eq("public_token", token)
       .single(),
     supabaseAdmin

@@ -1,17 +1,19 @@
+import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase";
+import { getBusinessIdFromHost } from "@/lib/tenant";
 import { notFound } from "next/navigation";
-
-const BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
 
 const formatMoney = (cents: number | null | undefined) =>
   "$" + ((cents ?? 0) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
 
 type PageParams = {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 };
 
 export default async function PublicInvoicePage({ params }: PageParams) {
-  const { token } = params;
+  const { token } = await params;
+  const host = (await headers()).get("host");
+  const businessId = await getBusinessIdFromHost(host);
 
   const [
     { data: invoice, error: invoiceError },
@@ -20,13 +22,13 @@ export default async function PublicInvoicePage({ params }: PageParams) {
     supabaseAdmin
       .from("invoices")
       .select("*, customers(name, email, phone)")
-      .eq("business_id", BUSINESS_ID)
+      .eq("business_id", businessId)
       .eq("public_token", token)
       .single(),
     supabaseAdmin
       .from("invoice_line_items")
       .select("*")
-      .order("sort_order", { ascending: true }), // filtered below when we know invoice id
+      .order("sort_order", { ascending: true }),
   ]);
 
   if (invoiceError || !invoice) {
@@ -39,7 +41,7 @@ export default async function PublicInvoicePage({ params }: PageParams) {
   const { data: business } = await supabaseAdmin
     .from("businesses")
     .select("*")
-    .eq("id", BUSINESS_ID)
+    .eq("id", businessId)
     .single();
 
   const typedLineItems =
@@ -83,7 +85,7 @@ export default async function PublicInvoicePage({ params }: PageParams) {
             <p className="text-sm text-slate-500">
               From{" "}
               <span className="font-medium text-slate-800">
-                {business?.name ?? "BillPay Secure — Test Business"}
+                {business?.name ?? "—"}
               </span>
             </p>
           </div>
@@ -209,8 +211,7 @@ export default async function PublicInvoicePage({ params }: PageParams) {
           </div>
 
           <p className="text-xs text-slate-500">
-            This is your customer-facing magic link view in the test environment.
-            Payments and downloadable PDFs will be enabled in production tenants.
+            Pay securely with Stripe. Download the PDF for your records.
           </p>
         </div>
       </div>

@@ -58,19 +58,13 @@ export default function Home() {
 
   return (
     <main className="min-h-screen flex flex-col lg:flex-row relative">
-      {/* Corner branding: logo + BillPay Secure (no tenant name) */}
+      {/* Corner branding: text only when logo shown in hero (avoid duplicate logos) */}
       <div className="absolute top-5 left-5 sm:top-6 sm:left-6 flex items-center gap-3 z-10">
-        {business?.logo_url ? (
-          <img
-            src={business.logo_url}
-            alt="BillPay"
-            className="h-14 w-14 sm:h-16 sm:w-16 rounded-xl border border-white/20 object-contain bg-white shadow-lg"
-          />
-        ) : (
+        {!business?.logo_url ? (
           <span className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-xl bg-emerald-500 text-white text-xl sm:text-2xl font-bold shadow-lg">
             BP
           </span>
-        )}
+        ) : null}
         <span className="flex flex-col leading-tight">
           <span className="text-lg sm:text-xl font-bold text-white drop-shadow-sm tracking-tight">
             BillPay

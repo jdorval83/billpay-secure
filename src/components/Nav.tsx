@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 type BusinessMeta = {
   name: string;
   logo_url: string | null;
+  kind?: string | null;
 };
 
 export default function Nav() {
@@ -22,6 +23,7 @@ export default function Nav() {
           setBusiness({
             name: data.business.name,
             logo_url: data.business.logo_url,
+            kind: data.business.kind,
           });
         }
       })
@@ -72,12 +74,13 @@ export default function Nav() {
         <div className="flex items-center gap-5">
           {link("/dashboard", "Dashboard")}
           {link("/customers", "Customers")}
-          {link("/bills", "Bills")}
+          {link("/bills", "Charges")}
           {link("/invoices", "Invoices")}
           {link("/reports", "Reports")}
           {link("/settings", "Settings")}
+          {link("/admin", "Admin")}
           <Link href="/bills/new" className="btn-primary text-sm py-2">
-            New Bill
+            New charge
           </Link>
           <button
             onClick={async () => {

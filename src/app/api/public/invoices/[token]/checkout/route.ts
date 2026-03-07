@@ -4,8 +4,15 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { getBusinessIdForRequest } from "@/lib/tenant";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const currency = process.env.STRIPE_CURRENCY || "usd";
+
+function getBaseUrl(request: Request): string {
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (envUrl) return envUrl.replace(/\/+$/, "");
+  const host = request.headers.get("host") || "";
+  const proto = request.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
 
 if (!stripeSecretKey) {
   throw new Error("STRIPE_SECRET_KEY is not set");
@@ -44,7 +51,7 @@ export async function GET(
     );
   }
 
-  const baseUrl = appUrl.replace(/\/+$/, "");
+  const baseUrl = getBaseUrl(_request);
   const successUrl = `${baseUrl}/public/invoices/${token}?paid=1`;
   const cancelUrl = `${baseUrl}/public/invoices/${token}?canceled=1`;
 

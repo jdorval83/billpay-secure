@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { getBusinessIdForRequest } from "@/lib/tenant";
 import { toCsv } from "@/lib/reports/csv";
 
-const BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
-
 export async function GET(request: Request) {
+  const businessId = await getBusinessIdForRequest(request);
   const url = new URL(request.url);
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
   let query = supabaseAdmin
     .from("bills")
     .select("id, customer_id, status, amount_cents, created_at, due_date, first_sent_at, last_sent_at")
-    .eq("business_id", BUSINESS_ID);
+    .eq("business_id", businessId);
   if (from) query = query.gte("created_at", from);
   if (to) query = query.lte("created_at", to);
   const { data, error } = await query;

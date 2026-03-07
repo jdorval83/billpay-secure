@@ -1,18 +1,20 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase";
+import { getBusinessIdFromHost } from "@/lib/tenant";
 import { notFound } from "next/navigation";
-
-const BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
 
 const formatMoney = (cents: number | null | undefined) =>
   "$" + ((cents ?? 0) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
 
 type PageParams = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
 export default async function InvoiceDetailPage({ params }: PageParams) {
-  const { id } = params;
+  const { id } = await params;
+  const host = (await headers()).get("host");
+  const businessId = await getBusinessIdFromHost(host);
 
   const [
     { data: invoice, error: invoiceError },
@@ -22,7 +24,7 @@ export default async function InvoiceDetailPage({ params }: PageParams) {
     supabaseAdmin
       .from("invoices")
       .select("*, customers(name, email, phone)")
-      .eq("business_id", BUSINESS_ID)
+      .eq("business_id", businessId)
       .eq("id", id)
       .single(),
     supabaseAdmin
@@ -46,7 +48,7 @@ export default async function InvoiceDetailPage({ params }: PageParams) {
   const { data: business } = await supabaseAdmin
     .from("businesses")
     .select("*")
-    .eq("id", BUSINESS_ID)
+    .eq("id", businessId)
     .single();
 
   const typedLineItems =
@@ -125,7 +127,7 @@ export default async function InvoiceDetailPage({ params }: PageParams) {
                 From
               </p>
               <p className="mt-1 text-sm font-semibold text-slate-900">
-                BillPay Secure — Test Business
+                {business?.name ?? "—"}
               </p>
               <p className="text-xs text-slate-500 mt-1">
                 Billing and AR for service businesses

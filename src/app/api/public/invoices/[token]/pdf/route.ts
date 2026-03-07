@@ -46,10 +46,6 @@ export async function GET(request: Request, { params }: RouteParams) {
   if (lineItemsError) {
     return NextResponse.json({ error: lineItemsError.message }, { status: 500 });
   }
-  if (businessError) {
-    return NextResponse.json({ error: businessError.message }, { status: 500 });
-  }
-
   const doc = new PDFDocument({ margin: 40 });
   const chunks: Buffer[] = [];
 
@@ -60,8 +56,8 @@ export async function GET(request: Request, { params }: RouteParams) {
     doc.on("error", reject);
   });
 
-  const bizName = (business as any)?.name || "BillPay Secure";
-  const supportEmail = (business as any)?.support_email || "support@billpaysecure.com";
+  const bizName = (business as any)?.name ?? "BillPay Secure";
+  const supportEmail = (business as any)?.support_email ?? "support@billpaysecure.com";
 
   const issuedDate = invoice.issued_at
     ? new Date(invoice.issued_at as string).toLocaleDateString()
@@ -174,6 +170,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
+      "Cache-Control": "private, no-cache, no-store",
       "Content-Disposition": `inline; filename="${String(
         invoice.invoice_number || "invoice"
       )}.pdf"`,

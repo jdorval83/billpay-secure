@@ -2,6 +2,28 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getBusinessIdForRequest } from "@/lib/tenant";
 
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const businessId = await getBusinessIdForRequest(request);
+  const { id } = await params;
+  if (!id) return NextResponse.json({ error: "Bill ID required" }, { status: 400 });
+
+  const { data: bill, error } = await supabaseAdmin
+    .from("bills")
+    .select("*, customers(name, email, phone)")
+    .eq("business_id", businessId)
+    .eq("id", id)
+    .single();
+
+  if (error || !bill) {
+    return NextResponse.json({ error: "Bill not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ bill });
+}
+
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   draft: ["finalized", "void"],
   finalized: ["draft", "sent", "void"],

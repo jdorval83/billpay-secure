@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+const PAGE_SIZE = 20;
 
 type Bill = {
   id: string;
@@ -30,6 +33,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function BillsPage() {
+  const router = useRouter();
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -38,6 +42,39 @@ export default function BillsPage() {
   const [deleting, setDeleting] = useState(false);
   const [statusChangingId, setStatusChangingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [page, setPage] = useState(1);
+  const [showAll, setShowAll] = useState(false);
+
+  const filteredBills = useMemo(() => {
+    let out = bills;
+    const q = search.trim().toLowerCase();
+    if (q) {
+      out = out.filter(
+        (b) =>
+          ((b.customers as { name?: string })?.name ?? "").toLowerCase().includes(q) ||
+          (b.description ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (dateFrom) {
+      out = out.filter((b) => b.due_date >= dateFrom);
+    }
+    if (dateTo) {
+      out = out.filter((b) => b.due_date <= dateTo);
+    }
+    return out;
+  }, [bills, search, dateFrom, dateTo]);
+
+  const paginatedBills = useMemo(() => {
+    if (showAll) return filteredBills;
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredBills.slice(start, start + PAGE_SIZE);
+  }, [filteredBills, page, showAll]);
+
+  const totalPages = Math.ceil(filteredBills.length / PAGE_SIZE);
+  const hasFilters = search.trim() || dateFrom || dateTo;
 
   const fetchBills = () => {
     fetch("/api/bills")
@@ -71,7 +108,7 @@ export default function BillsPage() {
     });
   };
 
-  const selectedBills = bills.filter((b) => selectedIds.has(b.id));
+  const selectedBills = filteredBills.filter((b) => selectedIds.has(b.id));
   const sameCustomer = selectedBills.length > 0 && selectedBills.every((b) => b.customer_id === selectedBills[0].customer_id);
   const canCreateInvoice = selectedBills.length > 0 && sameCustomer;
   const canDelete = selectedBills.length > 0;
@@ -202,11 +239,11 @@ export default function BillsPage() {
     <main className="page-container">
       <div className="content-max">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Bills</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Charges</h1>
           <div className="flex items-center gap-3">
             {canCreateInvoice ? (
               <button type="button" onClick={handleCreateInvoice} disabled={creatingInvoice} className="btn-primary">
-                {creatingInvoice ? "Creating…" : `Create invoice (${selectedIds.size} bill${selectedIds.size === 1 ? "" : "s"})`}
+                {creatingInvoice ? "Creating…" : `Create invoice (${selectedIds.size} charge${selectedIds.size === 1 ? "" : "s"})`}
               </button>
             ) : null}
             {canDelete ? (
@@ -219,7 +256,7 @@ export default function BillsPage() {
                 {deleting ? "Deleting…" : `Delete (${selectedIds.size})`}
               </button>
             ) : null}
-            <Link href="/bills/new" className="btn-secondary">New Bill</Link>
+            <Link href="/bills/new" className="btn-secondary">New charge</Link>
           </div>
         </div>
         {message && (
@@ -229,11 +266,51 @@ export default function BillsPage() {
         )}
         {bills.length === 0 ? (
           <div className="card p-12 text-center">
-            <p className="text-slate-600 mb-4">No bills yet.</p>
-            <Link href="/bills/new" className="btn-primary inline-block">Create your first bill</Link>
+            <p className="text-slate-600 mb-4">No charges yet.</p>
+            <Link href="/bills/new" className="btn-primary inline-block">Create your first charge</Link>
           </div>
         ) : (
-          <div className="card overflow-hidden">
+          <>
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                placeholder="Search by customer or description…"
+                className="input flex-1 min-w-[200px] max-w-xs"
+              />
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                placeholder="From"
+                className="input w-36"
+              />
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                placeholder="To"
+                className="input w-36"
+              />
+              <button
+                type="button"
+                onClick={() => { setShowAll(!showAll); setPage(1); }}
+                className="btn-secondary text-sm"
+              >
+                {showAll ? "Paginate" : "Show all"}
+              </button>
+              {hasFilters && (
+                <button
+                  type="button"
+                  onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setPage(1); }}
+                  className="text-sm text-slate-500 hover:text-slate-700"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+            <div className="card overflow-hidden">
             <table className="w-full">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200">
@@ -247,8 +324,18 @@ export default function BillsPage() {
                 </tr>
               </thead>
               <tbody>
-                {bills.map((b) => (
-                  <tr key={b.id} className={`border-b border-slate-100 transition-colors ${selectedIds.has(b.id) ? "bg-emerald-50/50" : "hover:bg-slate-50/50"}`}>
+                {filteredBills.length === 0 ? (
+                  <tr><td colSpan={7} className="p-6 text-center text-slate-500">No charges match your search.</td></tr>
+                ) : (
+                paginatedBills.map((b) => (
+                  <tr
+                    key={b.id}
+                    className={`border-b border-slate-100 transition-colors ${selectedIds.has(b.id) ? "bg-emerald-50/50" : "hover:bg-slate-50/50"} cursor-pointer`}
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest("button, input, a")) return;
+                      router.push(`/bills/${b.id}`);
+                    }}
+                  >
                     <td className="p-3 text-center">
                       {canSelectForInvoice(b) ? (
                         <input type="checkbox" checked={selectedIds.has(b.id)} onChange={() => toggleSelect(b.id)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
@@ -315,13 +402,40 @@ export default function BillsPage() {
                       })()}
                     </td>
                   </tr>
-                ))}
+                ))
+                )}
               </tbody>
             </table>
-          </div>
+            </div>
+            {!showAll && totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-sm text-slate-500">
+                  Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, filteredBills.length)} of {filteredBills.length}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    className="btn-secondary text-sm disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    className="btn-secondary text-sm disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
         <p className="mt-4 text-xs text-slate-500">
-          Draft bills must be <strong>Finalized</strong> before they are ready to send. Select one or more draft or finalized bills (same customer) and use <strong>Create invoice</strong> to add them to an invoice.
+          Draft charges must be <strong>Finalized</strong> before they are ready to send. Select one or more draft or finalized charges (same customer) and use <strong>Create invoice</strong> to add them to an invoice.
         </p>
       </div>
     </main>

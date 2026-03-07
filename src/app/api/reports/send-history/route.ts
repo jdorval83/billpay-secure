@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { getBusinessIdForRequest } from "@/lib/tenant";
 import { toCsv } from "@/lib/reports/csv";
 
-const BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
-
 export async function GET(request: Request) {
+  const businessId = await getBusinessIdForRequest(request);
   const url = new URL(request.url);
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   let query = supabaseAdmin
     .from("bill_send_events")
     .select("bill_id, invoice_id, customer_id, sent_at, channel, recipient, status, message_id, error_message")
-    .eq("business_id", BUSINESS_ID);
+    .eq("business_id", businessId);
   if (customerId) query = query.eq("customer_id", customerId);
   if (from) query = query.gte("sent_at", from);
   if (to) query = query.lte("sent_at", to);

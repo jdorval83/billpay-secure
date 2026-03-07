@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+const PAGE_SIZE = 20;
 
 type Invoice = {
   id: string;
@@ -21,6 +23,40 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [page, setPage] = useState(1);
+  const [showAll, setShowAll] = useState(false);
+
+  const filteredInvoices = useMemo(() => {
+    let out = invoices;
+    const q = search.trim().toLowerCase();
+    if (q) {
+      out = out.filter(
+        (inv) =>
+          (inv.invoice_number ?? "").toLowerCase().includes(q) ||
+          (inv.customers?.name ?? "").toLowerCase().includes(q) ||
+          (inv.customers?.email ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (dateFrom) {
+      out = out.filter((inv) => (inv.issued_at ?? "").slice(0, 10) >= dateFrom);
+    }
+    if (dateTo) {
+      out = out.filter((inv) => (inv.issued_at ?? "").slice(0, 10) <= dateTo);
+    }
+    return out;
+  }, [invoices, search, dateFrom, dateTo]);
+
+  const paginatedInvoices = useMemo(() => {
+    if (showAll) return filteredInvoices;
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredInvoices.slice(start, start + PAGE_SIZE);
+  }, [filteredInvoices, page, showAll]);
+
+  const totalPages = Math.ceil(filteredInvoices.length / PAGE_SIZE);
+  const hasFilters = search.trim() || dateFrom || dateTo;
 
   useEffect(() => {
     fetch("/api/invoices")
@@ -41,7 +77,7 @@ export default function InvoicesPage() {
     });
   };
 
-  const selectedInvoices = invoices.filter((inv) => selectedIds.has(inv.id));
+  const selectedInvoices = filteredInvoices.filter((inv) => selectedIds.has(inv.id));
   const canDelete = selectedInvoices.length > 0;
 
   const handleDeleteSelected = async () => {
@@ -97,7 +133,45 @@ export default function InvoicesPage() {
             <p className="text-sm text-slate-500">Select bills on the Bills page and use &quot;Create invoice&quot; to add them to an invoice.</p>
           </div>
         ) : (
-          <div className="card overflow-hidden">
+          <>
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                placeholder="Search by invoice # or customer…"
+                className="input flex-1 min-w-[200px] max-w-xs"
+              />
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                className="input w-36"
+              />
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                className="input w-36"
+              />
+              <button
+                type="button"
+                onClick={() => { setShowAll(!showAll); setPage(1); }}
+                className="btn-secondary text-sm"
+              >
+                {showAll ? "Paginate" : "Show all"}
+              </button>
+              {hasFilters && (
+                <button
+                  type="button"
+                  onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setPage(1); }}
+                  className="text-sm text-slate-500 hover:text-slate-700"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+            <div className="card overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-left">
@@ -114,7 +188,10 @@ export default function InvoicesPage() {
                 </tr>
               </thead>
               <tbody>
-                {invoices.map((inv) => (
+                {filteredInvoices.length === 0 ? (
+                  <tr><td colSpan={8} className="p-6 text-center text-slate-500">No invoices match your search.</td></tr>
+                ) : (
+                paginatedInvoices.map((inv) => (
                   <tr
                     key={inv.id}
                     className={`border-b border-slate-100 transition-colors ${
@@ -159,10 +236,37 @@ export default function InvoicesPage() {
                       </Link>
                     </td>
                   </tr>
-                ))}
+                ))
+                )}
               </tbody>
             </table>
-          </div>
+            </div>
+            {!showAll && totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-sm text-slate-500">
+                  Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, filteredInvoices.length)} of {filteredInvoices.length}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    className="btn-secondary text-sm disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    className="btn-secondary text-sm disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>
