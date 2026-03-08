@@ -270,7 +270,7 @@ export default function BillsPage() {
                   try {
                     const r = await fetch("/api/reminders/blast");
                     const d = await r.json();
-                    const emails = [...new Set((d.outstanding || []).map((x: { email: string }) => x.email).filter(Boolean))];
+                    const emails = Array.from(new Set((d.outstanding || []).map((x: { email: string }) => x.email).filter(Boolean)));
                     setBlastReminderModal({ count: d.outstanding?.length ?? 0, emails });
                   } catch {
                     setMessage({ type: "error", text: "Could not load outstanding bills." });
