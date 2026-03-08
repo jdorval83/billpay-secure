@@ -17,7 +17,7 @@ export default function CompliancePage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://your-domain.com";
+  const displayUrl = baseUrl || "https://billpaysecure.com";
 
   return (
     <main className="page-container">
@@ -41,10 +41,10 @@ export default function CompliancePage() {
             <h2 className="text-sm font-semibold text-slate-700 mb-2">Privacy Policy URL</h2>
             <input
               readOnly
-              value={`${baseUrl}/privacy`}
+              value={`${displayUrl}/privacy`}
               className="input text-sm font-mono mb-2"
             />
-            <button type="button" onClick={() => copyToClipboard(`${baseUrl}/privacy`, "privacy")} className="btn-secondary text-sm">
+            <button type="button" onClick={() => copyToClipboard(`${displayUrl}/privacy`, "privacy")} className="btn-secondary text-sm">
               {copied ? "Copied!" : "Copy URL"}
             </button>
           </div>
@@ -53,10 +53,10 @@ export default function CompliancePage() {
             <h2 className="text-sm font-semibold text-slate-700 mb-2">Terms and Conditions URL</h2>
             <input
               readOnly
-              value={`${baseUrl}/terms`}
+              value={`${displayUrl}/terms`}
               className="input text-sm font-mono mb-2"
             />
-            <button type="button" onClick={() => copyToClipboard(`${baseUrl}/terms`, "terms")} className="btn-secondary text-sm">
+            <button type="button" onClick={() => copyToClipboard(`${displayUrl}/terms`, "terms")} className="btn-secondary text-sm">
               {copied ? "Copied!" : "Copy URL"}
             </button>
           </div>
