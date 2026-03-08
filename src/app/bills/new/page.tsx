@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { Customer } from "@/lib/supabase";
 
-export default function NewBillPage() {
+function NewBillForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -126,5 +126,24 @@ export default function NewBillPage() {
         </form>
       </div>
     </main>
+  );
+}
+
+export default function NewBillPage() {
+  return (
+    <Suspense fallback={
+      <main className="page-container">
+        <div className="content-max max-w-md">
+          <div className="skeleton h-8 w-32 mb-6" />
+          <div className="card p-6 space-y-4">
+            <div className="skeleton h-10 w-full" />
+            <div className="skeleton h-10 w-full" />
+            <div className="skeleton h-10 w-full" />
+          </div>
+        </div>
+      </main>
+    }>
+      <NewBillForm />
+    </Suspense>
   );
 }
