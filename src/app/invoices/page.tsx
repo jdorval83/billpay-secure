@@ -26,6 +26,7 @@ export default function InvoicesPage() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const [showAll, setShowAll] = useState(false);
 
@@ -43,11 +44,10 @@ export default function InvoicesPage() {
     if (dateFrom) {
       out = out.filter((inv) => (inv.issued_at ?? "").slice(0, 10) >= dateFrom);
     }
-    if (dateTo) {
-      out = out.filter((inv) => (inv.issued_at ?? "").slice(0, 10) <= dateTo);
-    }
+    if (dateTo) out = out.filter((inv) => (inv.issued_at ?? "").slice(0, 10) <= dateTo);
+    if (statusFilter) out = out.filter((inv) => (inv.status || "").toLowerCase() === statusFilter);
     return out;
-  }, [invoices, search, dateFrom, dateTo]);
+  }, [invoices, search, dateFrom, dateTo, statusFilter]);
 
   const paginatedInvoices = useMemo(() => {
     if (showAll) return filteredInvoices;
@@ -56,7 +56,7 @@ export default function InvoicesPage() {
   }, [filteredInvoices, page, showAll]);
 
   const totalPages = Math.ceil(filteredInvoices.length / PAGE_SIZE);
-  const hasFilters = search.trim() || dateFrom || dateTo;
+  const hasFilters = search.trim() || dateFrom || dateTo || statusFilter;
 
   useEffect(() => {
     fetch("/api/invoices")
@@ -154,6 +154,13 @@ export default function InvoicesPage() {
                 onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
                 className="input w-36"
               />
+              <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="input w-32">
+                <option value="">All statuses</option>
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="paid">Paid</option>
+                <option value="void">Void</option>
+              </select>
               <button
                 type="button"
                 onClick={() => { setShowAll(!showAll); setPage(1); }}
@@ -164,7 +171,7 @@ export default function InvoicesPage() {
               {hasFilters && (
                 <button
                   type="button"
-                  onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setPage(1); }}
+                  onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setStatusFilter(""); setPage(1); }}
                   className="text-sm text-slate-500 hover:text-slate-700"
                 >
                   Clear filters

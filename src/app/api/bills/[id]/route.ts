@@ -28,7 +28,7 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   draft: ["finalized", "void"],
   finalized: ["draft", "sent", "void"],
   sent: ["paid", "written_off", "void"],
-  billed: ["void"],
+  billed: ["sent", "paid", "written_off", "void"],
   paid: [],
   written_off: [],
   void: [],

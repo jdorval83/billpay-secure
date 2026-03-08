@@ -8,6 +8,7 @@ export default function NewCustomerPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [smsConsent, setSmsConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -23,7 +24,7 @@ export default function NewCustomerPage() {
       const res = await fetch("/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), email: email.trim() || null, phone: phone.trim() || null }),
+        body: JSON.stringify({ name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, sms_consent: smsConsent }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create customer");
@@ -53,6 +54,19 @@ export default function NewCustomerPage() {
           <div>
             <label className="label">Phone</label>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="input" placeholder="(555) 123-4567" />
+          </div>
+          <div>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={smsConsent}
+                onChange={(e) => setSmsConsent(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className="text-sm text-slate-700">
+                Customer consents to receive payment reminder text messages. Message and data rates may apply. See <a href="/terms" className="text-emerald-600 hover:underline" target="_blank" rel="noopener noreferrer">Terms</a> and <a href="/privacy" className="text-emerald-600 hover:underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+              </span>
+            </label>
           </div>
           <div className="flex gap-3 pt-2">
             <button type="submit" disabled={loading} className="btn-primary">{loading ? "Saving…" : "Add Customer"}</button>

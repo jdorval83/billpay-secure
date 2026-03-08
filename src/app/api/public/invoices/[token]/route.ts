@@ -1,33 +1,20 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getBusinessIdForRequest } from "@/lib/tenant";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
-  const businessId = await getBusinessIdForRequest(request);
   const { token } = await params;
   if (!token) {
     return NextResponse.json({ error: "Token required" }, { status: 400 });
   }
 
-  const [
-    { data: invoice, error: invoiceError },
-    { data: lineItems, error: lineItemsError },
-  ] = await Promise.all([
-    supabaseAdmin
-      .from("invoices")
-      .select("*, customers(name, email, phone)")
-      .eq("business_id", businessId)
-      .eq("public_token", token)
-      .single(),
-    supabaseAdmin
-      .from("invoice_line_items")
-      .select("*")
-      .eq("invoice_id", token) // will be replaced below if invoice is found
-      .limit(0),
-  ]);
+  const { data: invoice, error: invoiceError } = await supabaseAdmin
+    .from("invoices")
+    .select("*, customers(name, email, phone)")
+    .eq("public_token", token)
+    .single();
 
   if (invoiceError || !invoice) {
     return NextResponse.json(

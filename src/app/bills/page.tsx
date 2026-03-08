@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const PAGE_SIZE = 20;
 
@@ -14,6 +14,7 @@ type Bill = {
   due_date: string;
   description: string;
   status: string;
+  recurring_schedule?: string | null;
   customers?: { name?: string } | null;
 };
 
@@ -47,8 +48,9 @@ function StatusBadge({ bill }: { bill: Bill }) {
   return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${style}`}>{label}</span>;
 }
 
-export default function BillsPage() {
+function BillsPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -60,10 +62,14 @@ export default function BillsPage() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [recurringFilter, setRecurringFilter] = useState("");
   const [page, setPage] = useState(1);
   const [showAll, setShowAll] = useState(false);
   const [blastReminderLoading, setBlastReminderLoading] = useState(false);
-  const [blastReminderModal, setBlastReminderModal] = useState<{ count: number; emails: string[] } | null>(null);
+  const [blastReminderModal, setBlastReminderModal] = useState<"confirm" | null>(null);
+  const [blastReminderData, setBlastReminderData] = useState<{ count: number; recipients: { phone: string; customerName: string; amountCents: number; dueDate: string }[] } | null>(null);
+  const [blastSending, setBlastSending] = useState(false);
 
   const outstandingCount = useMemo(() =>
     bills.filter((b) => (b.balance_cents ?? 0) > 0 && ["finalized", "billed", "sent"].includes((b.status || "").toLowerCase())).length,
@@ -79,14 +85,23 @@ export default function BillsPage() {
           (b.description ?? "").toLowerCase().includes(q)
       );
     }
-    if (dateFrom) {
-      out = out.filter((b) => b.due_date >= dateFrom);
+    if (dateFrom) out = out.filter((b) => b.due_date >= dateFrom);
+    if (dateTo) out = out.filter((b) => b.due_date <= dateTo);
+    if (statusFilter) {
+      const today = new Date().toISOString().slice(0, 10);
+      if (statusFilter === "overdue") {
+        out = out.filter((b) => {
+          const s = (b.status || "").toLowerCase();
+          return (s === "sent" || s === "billed" || s === "finalized") && b.balance_cents > 0 && b.due_date < today;
+        });
+      } else {
+        out = out.filter((b) => (b.status || "").toLowerCase() === statusFilter);
+      }
     }
-    if (dateTo) {
-      out = out.filter((b) => b.due_date <= dateTo);
-    }
+    if (recurringFilter === "__none") out = out.filter((b) => !b.recurring_schedule);
+    else if (recurringFilter) out = out.filter((b) => (b.recurring_schedule || "").toLowerCase() === recurringFilter);
     return out;
-  }, [bills, search, dateFrom, dateTo]);
+  }, [bills, search, dateFrom, dateTo, statusFilter, recurringFilter]);
 
   const paginatedBills = useMemo(() => {
     if (showAll) return filteredBills;
@@ -95,7 +110,7 @@ export default function BillsPage() {
   }, [filteredBills, page, showAll]);
 
   const totalPages = Math.ceil(filteredBills.length / PAGE_SIZE);
-  const hasFilters = search.trim() || dateFrom || dateTo;
+  const hasFilters = search.trim() || dateFrom || dateTo || statusFilter || recurringFilter;
 
   const fetchBills = () => {
     fetch("/api/bills")
@@ -107,6 +122,11 @@ export default function BillsPage() {
       .catch(() => setBills([]))
       .finally(() => setLoading(false));
   };
+
+  useEffect(() => {
+    const q = searchParams?.get("search");
+    if (q) setSearch(q);
+  }, [searchParams]);
 
   useEffect(() => {
     setLoading(true);
@@ -270,8 +290,14 @@ export default function BillsPage() {
                   try {
                     const r = await fetch("/api/reminders/blast");
                     const d = await r.json();
-                    const emails = Array.from(new Set((d.outstanding || []).map((x: { email: string }) => x.email).filter(Boolean))) as string[];
-                    setBlastReminderModal({ count: d.outstanding?.length ?? 0, emails });
+                    const recipients = (d.outstanding || []).map((x: { phone: string; customerName: string; amountCents: number; dueDate: string }) => ({
+                      phone: x.phone,
+                      customerName: x.customerName,
+                      amountCents: x.amountCents,
+                      dueDate: x.dueDate,
+                    }));
+                    setBlastReminderData({ count: recipients.length, recipients });
+                    setBlastReminderModal("confirm");
                   } catch {
                     setMessage({ type: "error", text: "Could not load outstanding bills." });
                   } finally {
@@ -302,19 +328,55 @@ export default function BillsPage() {
             {message.text}
           </div>
         )}
-        {blastReminderModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setBlastReminderModal(null)}>
+        {blastReminderModal === "confirm" && blastReminderData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => { setBlastReminderModal(null); setBlastReminderData(null); }}>
             <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">Payment reminders</h3>
-              <p className="text-sm text-slate-600 mb-4">
-                {blastReminderModal.count} outstanding bill{blastReminderModal.count !== 1 ? "s" : ""} with customer emails. Copy addresses below to send reminders from your email client, or set up Resend API for in-app sending.
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">Send text reminders</h3>
+              <p className="text-sm text-slate-600 mb-6">
+                Are you sure you want to send a text reminder for all {blastReminderData.count} outstanding bill{blastReminderData.count !== 1 ? "s" : ""}?
               </p>
-              <textarea readOnly rows={6} className="input text-sm font-mono" value={blastReminderModal.emails.join(", ")} />
-              <div className="flex gap-2 mt-4">
-                <button type="button" onClick={() => { navigator.clipboard.writeText(blastReminderModal.emails.join(", ")); setMessage({ type: "success", text: "Copied to clipboard." }); setBlastReminderModal(null); }} className="btn-primary">
-                  Copy emails
+              {blastReminderData.recipients.length === 0 ? (
+                <p className="text-sm text-amber-600 mb-4">No customer phone numbers on file. Add phone numbers to customers to send text reminders.</p>
+              ) : null}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (blastReminderData.recipients.length === 0) {
+                      setBlastReminderModal(null);
+                      setBlastReminderData(null);
+                      return;
+                    }
+                    setBlastSending(true);
+                    try {
+                      const r = await fetch("/api/reminders/send-sms", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ recipients: blastReminderData.recipients }),
+                      });
+                      const data = await r.json();
+                      if (!r.ok) {
+                        setMessage({ type: "error", text: data.error || "Failed to send texts." });
+                      } else {
+                        setMessage({ type: "success", text: `Text reminders sent to ${data.sent} of ${data.total} customer${data.total !== 1 ? "s" : ""}.` });
+                        setBlastReminderModal(null);
+                        setBlastReminderData(null);
+                        fetchBills();
+                      }
+                    } catch {
+                      setMessage({ type: "error", text: "Failed to send text reminders." });
+                    } finally {
+                      setBlastSending(false);
+                    }
+                  }}
+                  disabled={blastReminderData.recipients.length === 0 || blastSending}
+                  className="btn-primary"
+                >
+                  {blastSending ? "Sending…" : "Send"}
                 </button>
-                <button type="button" onClick={() => setBlastReminderModal(null)} className="btn-secondary">Close</button>
+                <button type="button" onClick={() => { setBlastReminderModal(null); setBlastReminderData(null); }} className="btn-secondary" disabled={blastSending}>
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
@@ -348,6 +410,24 @@ export default function BillsPage() {
                 placeholder="To"
                 className="input w-36"
               />
+              <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="input w-32">
+                <option value="">All statuses</option>
+                <option value="draft">Draft</option>
+                <option value="finalized">Finished</option>
+                <option value="billed">Billed</option>
+                <option value="sent">Sent</option>
+                <option value="paid">Paid</option>
+                <option value="overdue">Overdue</option>
+                <option value="written_off">Written off</option>
+                <option value="void">Void</option>
+              </select>
+              <select value={recurringFilter} onChange={(e) => { setRecurringFilter(e.target.value); setPage(1); }} className="input w-32">
+                <option value="">All types</option>
+                <option value="weekly">Recurring: Weekly</option>
+                <option value="biweekly">Recurring: Biweekly</option>
+                <option value="monthly">Recurring: Monthly</option>
+                <option value="__none">One-time only</option>
+              </select>
               <button
                 type="button"
                 onClick={() => { setShowAll(!showAll); setPage(1); }}
@@ -358,7 +438,7 @@ export default function BillsPage() {
               {hasFilters && (
                 <button
                   type="button"
-                  onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setPage(1); }}
+                  onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setStatusFilter(""); setRecurringFilter(""); setPage(1); }}
                   className="text-sm text-slate-500 hover:text-slate-700"
                 >
                   Clear filters
@@ -431,9 +511,19 @@ export default function BillsPage() {
                             </button>
                           );
                         }
-                        if (s === "sent") {
+                        if (s === "sent" || s === "billed") {
                           return (
-                            <div className="flex justify-end gap-3">
+                            <div className="flex justify-end gap-3" onClick={(e) => e.stopPropagation()}>
+                              {s === "billed" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkSent(b)}
+                                  disabled={isBusy}
+                                  className="text-sm font-medium text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
+                                >
+                                  {statusChangingId === b.id ? "Updating…" : "Mark sent"}
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => handleMarkPaid(b)}
@@ -494,5 +584,23 @@ export default function BillsPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function BillsPage() {
+  return (
+    <Suspense fallback={
+      <main className="page-container">
+        <div className="content-max">
+          <div className="skeleton h-8 w-24 mb-6" />
+          <div className="card p-8">
+            <div className="skeleton h-12 w-full mb-3" />
+            <div className="skeleton h-12 w-full" />
+          </div>
+        </div>
+      </main>
+    }>
+      <BillsPageContent />
+    </Suspense>
   );
 }

@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Customer } from "@/lib/supabase";
 
 const PAGE_SIZE = 20;
 
 export default function CustomersPage() {
+  const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -103,7 +105,11 @@ export default function CustomersPage() {
                   <tr><td colSpan={3} className="p-6 text-center text-slate-500">No customers match your search.</td></tr>
                 ) : (
                 paginatedCustomers.map((c) => (
-                  <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                  <tr
+                    key={c.id}
+                    className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors cursor-pointer"
+                    onClick={() => router.push(`/customers/${c.id}`)}
+                  >
                     <td className="p-4 font-medium text-slate-900">{c.name}</td>
                     <td className="p-4 text-slate-600">{c.email || "—"}</td>
                     <td className="p-4 text-slate-600">{c.phone || "—"}</td>

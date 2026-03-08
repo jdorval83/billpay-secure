@@ -1,41 +1,23 @@
 import { NextResponse } from "next/server";
 import PDFDocument from "pdfkit";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getBusinessIdForRequest } from "@/lib/tenant";
 
 type RouteParams = {
   params: Promise<{ token: string }>;
 };
 
 export async function GET(request: Request, { params }: RouteParams) {
-  const businessId = await getBusinessIdForRequest(request);
   const { token } = await params;
 
   if (!token) {
     return NextResponse.json({ error: "Token required" }, { status: 400 });
   }
 
-  const [
-    { data: invoice, error: invoiceError },
-    { data: lineItems, error: lineItemsError },
-    { data: business, error: businessError },
-  ] = await Promise.all([
-    supabaseAdmin
-      .from("invoices")
-      .select("*, customers(name, email, phone)")
-      .eq("business_id", businessId)
-      .eq("public_token", token)
-      .single(),
-    supabaseAdmin
-      .from("invoice_line_items")
-      .select("*")
-      .order("sort_order", { ascending: true }),
-    supabaseAdmin
-      .from("businesses")
-      .select("*")
-      .eq("id", businessId)
-      .single(),
-  ]);
+  const { data: invoice, error: invoiceError } = await supabaseAdmin
+    .from("invoices")
+    .select("*, customers(name, email, phone)")
+    .eq("public_token", token)
+    .single();
 
   if (invoiceError || !invoice) {
     return NextResponse.json(
@@ -43,6 +25,19 @@ export async function GET(request: Request, { params }: RouteParams) {
       { status: 404 }
     );
   }
+
+  const businessId = (invoice as { business_id?: string }).business_id;
+  const [{ data: lineItems, error: lineItemsError }, { data: business }] = await Promise.all([
+    supabaseAdmin
+      .from("invoice_line_items")
+      .select("*")
+      .eq("invoice_id", invoice.id)
+      .order("sort_order", { ascending: true }),
+    businessId
+      ? supabaseAdmin.from("businesses").select("*").eq("id", businessId).single()
+      : Promise.resolve({ data: null }),
+  ]);
+
   if (lineItemsError) {
     return NextResponse.json({ error: lineItemsError.message }, { status: 500 });
   }
@@ -109,13 +104,11 @@ export async function GET(request: Request, { params }: RouteParams) {
   const items =
     (lineItems as {
       id: string;
-      invoice_id: string;
       description: string;
       quantity: number | null;
       unit_price_cents: number | null;
       amount_cents: number;
-    }[])
-      ?.filter((li) => li.invoice_id === invoice.id) || [];
+    }[]) || [];
 
   const toMoney = (cents: number | null | undefined) =>
     `$${((cents ?? 0) / 100).toFixed(2)}`;
