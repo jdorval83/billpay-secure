@@ -4,52 +4,57 @@
 
 :root {
   --foreground: #0f172a;
-  --background: #f8fafc;
+  --background: #f1f5f9;
+  --card-bg: #ffffff;
+  --border: #e2e8f0;
+  --accent: #059669;
+  --accent-hover: #047857;
 }
 
 @layer base {
   body {
     color: var(--foreground);
-    background:
-      radial-gradient(circle at top left, rgba(16, 185, 129, 0.05), transparent 50%),
-      radial-gradient(circle at bottom right, rgba(15, 23, 42, 0.04), transparent 50%),
-      var(--background);
+    background: #f8fafc;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
-  h1, h2, h3 { @apply text-slate-900 tracking-tight; }
+  h1, h2, h3 {
+    @apply text-slate-900 tracking-tight font-semibold;
+  }
 }
 
 @layer components {
   .card {
-    @apply bg-white rounded-xl border border-slate-200/80 shadow-sm shadow-slate-200/50;
+    @apply bg-white rounded-lg border border-slate-200/90 shadow-sm;
   }
   .card-hover {
-    @apply card transition-shadow duration-200 hover:shadow-md hover:shadow-slate-300/30;
+    @apply card transition-all duration-200 hover:shadow-md hover:border-slate-200;
   }
   .btn-primary {
-    @apply px-4 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700
-           transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed
-           focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2;
+    @apply inline-flex items-center justify-center px-4 py-2.5 bg-emerald-600 text-white text-sm font-medium
+           rounded-md hover:bg-emerald-700 transition-colors duration-150
+           disabled:opacity-60 disabled:cursor-not-allowed
+           focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:ring-offset-2;
   }
   .btn-secondary {
-    @apply px-4 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400
-           transition-colors duration-150 font-medium text-slate-700 focus:outline-none focus:ring-2
-           focus:ring-slate-400 focus:ring-offset-2;
+    @apply inline-flex items-center justify-center px-4 py-2.5 border border-slate-300 rounded-md
+           text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 hover:border-slate-400
+           transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2;
   }
   .input {
-    @apply w-full border border-slate-300 rounded-lg px-4 py-2.5 text-slate-900
-           placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500
-           focus:border-emerald-500 transition-shadow duration-150;
+    @apply w-full border border-slate-300 rounded-md px-3 py-2 text-slate-900 text-sm
+           placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50
+           focus:border-emerald-500 transition-colors;
   }
   .label {
     @apply block text-sm font-medium text-slate-700 mb-1.5;
   }
   .page-container {
-    @apply min-h-screen bg-slate-50/80;
+    @apply min-h-screen bg-slate-50;
   }
   .content-max {
-    @apply max-w-4xl mx-auto px-4 sm:px-6 py-8;
+    @apply max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8;
   }
   .skeleton {
-    @apply animate-pulse rounded bg-slate-200;
+    @apply animate-pulse rounded-md bg-slate-200;
   }
 }

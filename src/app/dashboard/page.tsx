@@ -167,12 +167,12 @@ export default function DashboardPage() {
           <Link href="/bills" className="card-hover p-6 block">
             <p className="text-sm font-medium text-slate-600">Total AR (outstanding)</p>
             <p className="text-2xl font-bold text-slate-900 mt-1">{formatMoney(totalAR)}</p>
-            <p className="text-xs text-slate-500 mt-2">View charges</p>
+            <p className="text-xs text-slate-500 mt-2">View bills</p>
           </Link>
           <Link href="/bills" className="card-hover p-6 block">
-            <p className="text-sm font-medium text-slate-600">Unpaid charges</p>
+            <p className="text-sm font-medium text-slate-600">Unpaid bills</p>
             <p className="text-2xl font-bold text-slate-900 mt-1">{unpaid.length}</p>
-            <p className="text-xs text-slate-500 mt-2">View charges</p>
+            <p className="text-xs text-slate-500 mt-2">View bills</p>
           </Link>
           <Link href="/customers" className="card-hover p-6 block">
             <p className="text-sm font-medium text-slate-600">Customers</p>
@@ -180,15 +180,15 @@ export default function DashboardPage() {
             <p className="text-xs text-slate-500 mt-2">View all customers</p>
           </Link>
           <Link href="/bills" className="card-hover p-6 block">
-            <p className="text-sm font-medium text-slate-600">Paid charges</p>
+            <p className="text-sm font-medium text-slate-600">Paid bills</p>
             <p className="text-2xl font-bold text-slate-900 mt-1">{paid.length}</p>
-            <p className="text-xs text-slate-500 mt-2">View charges</p>
+            <p className="text-xs text-slate-500 mt-2">View bills</p>
           </Link>
         </div>
         {stats && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             <div className="card p-6">
-              <p className="text-sm font-medium text-slate-600">Total charges (all time)</p>
+              <p className="text-sm font-medium text-slate-600">Total billed (all time)</p>
               <p className="text-2xl font-bold text-slate-900 mt-1">{formatMoney(stats.totalCharges)}</p>
             </div>
             <div className="card p-6">
@@ -216,7 +216,7 @@ export default function DashboardPage() {
               </ResponsiveContainer>
             </div>
             <div className="card p-6">
-              <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Charges vs payments (last 6 months)</h3>
+              <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Bills vs payments (last 6 months)</h3>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart
                   data={stats.byMonth.map((m) => ({ month: m.month, charges: m.charges / 100, payments: m.payments / 100 }))}
@@ -227,7 +227,7 @@ export default function DashboardPage() {
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + v} />
                   <Tooltip formatter={(v: number) => ["$" + v.toFixed(2), ""]} />
                   <Legend />
-                  <Bar dataKey="charges" fill="#64748b" name="Charges" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="charges" fill="#64748b" name="Bills" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="payments" fill="#10b981" name="Payments" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -246,7 +246,7 @@ export default function DashboardPage() {
           {recordPaymentOpen && (
             <div className="card p-6">
               <form ref={recordPaymentRef} onSubmit={handleRecordPayment} className="space-y-4">
-                <p className="text-sm text-slate-600">Record a payment you received by check, cash, or other method. Optionally link to charges to mark them paid and attach a photo of the check (max 500KB).</p>
+                <p className="text-sm text-slate-600">Record a payment received by check, cash, or other method. Optionally link to bills to mark them paid and attach a photo of the check (max 500KB).</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="label">Amount ($)</label>
@@ -311,11 +311,11 @@ export default function DashboardPage() {
                   />
                 </div>
                 <div>
-                  <label className="label">Mark these charges as paid (optional)</label>
-                  <p className="text-xs text-slate-500 mb-2">Select unpaid charges that this payment covers.</p>
+                  <label className="label">Mark these bills as paid (optional)</label>
+                  <p className="text-xs text-slate-500 mb-2">Select unpaid bills that this payment covers.</p>
                   <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2 space-y-1">
                     {unpaid.length === 0 ? (
-                      <p className="text-sm text-slate-500">No unpaid charges.</p>
+                      <p className="text-sm text-slate-500">No unpaid bills.</p>
                     ) : (
                       unpaid.map((b) => (
                         <label key={b.id} className="flex items-center gap-2 cursor-pointer">
@@ -350,7 +350,7 @@ export default function DashboardPage() {
         )}
         <div className="flex flex-wrap items-center gap-3 mb-10">
           <Link href="/customers/new" className="btn-primary">Add Customer</Link>
-          <Link href="/bills/new" className="btn-secondary">New charge</Link>
+          <Link href="/bills/new" className="btn-secondary">New bill</Link>
         </div>
       </div>
     </main>

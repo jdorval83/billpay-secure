@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   try {
     const businessId = await getBusinessIdForRequest(request);
     const body = await request.json();
-    const { customer_id, amount_cents, description, due_date } = body;
+    const { customer_id, amount_cents, description, due_date, recurring_schedule } = body;
     if (!customer_id || typeof customer_id !== "string") {
       return NextResponse.json({ error: "Customer is required" }, { status: 400 });
     }
@@ -34,6 +34,7 @@ export async function POST(request: Request) {
         description: (description && String(description).trim()) || "Invoice",
         due_date: due_date || new Date().toISOString().split("T")[0],
         status: "draft",
+        recurring_schedule: ["weekly", "biweekly", "monthly"].includes(recurring_schedule) ? recurring_schedule : null,
       })
       .select("*, customers(name, email, phone)")
       .single();

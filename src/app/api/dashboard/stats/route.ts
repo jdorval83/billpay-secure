@@ -57,10 +57,11 @@ export async function GET(request: Request) {
 
   const agingBuckets = [
     { bucket: "Current", min: -Infinity, max: 0 },
-    { bucket: "1-30", min: 1, max: 30 },
-    { bucket: "31-60", min: 31, max: 60 },
-    { bucket: "61-90", min: 61, max: 90 },
-    { bucket: "90+", min: 91, max: Infinity },
+    { bucket: "1-7", min: 1, max: 7 },
+    { bucket: "8-14", min: 8, max: 14 },
+    { bucket: "15-21", min: 15, max: 21 },
+    { bucket: "22-30", min: 22, max: 30 },
+    { bucket: "31+", min: 31, max: Infinity },
   ];
   const today = new Date();
   const aging = agingBuckets.map(({ bucket, min, max }) => {

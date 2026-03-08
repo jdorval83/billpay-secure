@@ -48,8 +48,8 @@ export default function Nav() {
   const displayName = business?.name || "BillPay Secure";
 
   return (
-    <nav className="bg-white/90 backdrop-blur border-b border-slate-200/80 sticky top-0 z-50 shadow-sm">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex justify-between items-center">
+    <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
         <Link href="/dashboard" className="flex items-center gap-2">
           {business?.logo_url ? (
             <img
@@ -71,16 +71,17 @@ export default function Nav() {
             </span>
           </span>
         </Link>
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-6">
           {link("/dashboard", "Dashboard")}
           {link("/customers", "Customers")}
-          {link("/bills", "Charges")}
+          {link("/bills", "Bills")}
+          {link("/templates", "Templates")}
           {link("/invoices", "Invoices")}
           {link("/reports", "Reports")}
           {link("/settings", "Settings")}
           {link("/admin", "Admin")}
           <Link href="/bills/new" className="btn-primary text-sm py-2">
-            New charge
+            New bill
           </Link>
           <button
             onClick={async () => {

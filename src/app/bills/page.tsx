@@ -17,19 +17,34 @@ type Bill = {
   customers?: { name?: string } | null;
 };
 
-function StatusBadge({ status }: { status: string }) {
-  const s = (status || "draft").toLowerCase();
+const STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
+  finalized: "Finished",
+  billed: "Billed",
+  sent: "Sent",
+  paid: "Paid",
+  written_off: "Written off",
+  void: "Void",
+};
+function StatusBadge({ bill }: { bill: Bill }) {
+  const s = (bill.status || "draft").toLowerCase();
+  const today = new Date().toISOString().slice(0, 10);
+  const isOverdue = (s === "sent" || s === "billed" || s === "finalized") && bill.balance_cents > 0 && bill.due_date < today;
+  const displayStatus = isOverdue ? "overdue" : s;
   const styles: Record<string, string> = {
     draft: "bg-amber-50 text-amber-700 border-amber-200",
     finalized: "bg-sky-50 text-sky-700 border-sky-200",
+    finished: "bg-sky-50 text-sky-700 border-sky-200",
     billed: "bg-slate-100 text-slate-700 border-slate-200",
     sent: "bg-indigo-50 text-indigo-700 border-indigo-200",
     paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    written_off: "bg-rose-50 text-rose-700 border-rose-200",
+    overdue: "bg-rose-50 text-rose-700 border-rose-200",
+    written_off: "bg-rose-50 text-rose-600 border-rose-200",
     void: "bg-slate-100 text-slate-500 border-slate-200",
   };
-  const style = styles[s] || styles.draft;
-  return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${style}`}>{s}</span>;
+  const style = styles[displayStatus] || styles.draft;
+  const label = displayStatus === "overdue" ? "Overdue" : (STATUS_LABELS[s] || s);
+  return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${style}`}>{label}</span>;
 }
 
 export default function BillsPage() {
@@ -47,6 +62,12 @@ export default function BillsPage() {
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [showAll, setShowAll] = useState(false);
+  const [blastReminderLoading, setBlastReminderLoading] = useState(false);
+  const [blastReminderModal, setBlastReminderModal] = useState<{ count: number; emails: string[] } | null>(null);
+
+  const outstandingCount = useMemo(() =>
+    bills.filter((b) => (b.balance_cents ?? 0) > 0 && ["finalized", "billed", "sent"].includes((b.status || "").toLowerCase())).length,
+  [bills]);
 
   const filteredBills = useMemo(() => {
     let out = bills;
@@ -239,24 +260,41 @@ export default function BillsPage() {
     <main className="page-container">
       <div className="content-max">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Charges</h1>
-          <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-slate-900">Bills</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            {outstandingCount > 0 && (
+              <button
+                type="button"
+                onClick={async () => {
+                  setBlastReminderLoading(true);
+                  try {
+                    const r = await fetch("/api/reminders/blast");
+                    const d = await r.json();
+                    const emails = [...new Set((d.outstanding || []).map((x: { email: string }) => x.email).filter(Boolean))];
+                    setBlastReminderModal({ count: d.outstanding?.length ?? 0, emails });
+                  } catch {
+                    setMessage({ type: "error", text: "Could not load outstanding bills." });
+                  } finally {
+                    setBlastReminderLoading(false);
+                  }
+                }}
+                disabled={blastReminderLoading}
+                className="btn-secondary"
+              >
+                {blastReminderLoading ? "Loading…" : `Remind all (${outstandingCount})`}
+              </button>
+            )}
             {canCreateInvoice ? (
               <button type="button" onClick={handleCreateInvoice} disabled={creatingInvoice} className="btn-primary">
-                {creatingInvoice ? "Creating…" : `Create invoice (${selectedIds.size} charge${selectedIds.size === 1 ? "" : "s"})`}
+                {creatingInvoice ? "Creating…" : `Create invoice (${selectedIds.size})`}
               </button>
             ) : null}
             {canDelete ? (
-              <button
-                type="button"
-                onClick={handleDeleteSelected}
-                disabled={deleting}
-                className="btn-secondary"
-              >
+              <button type="button" onClick={handleDeleteSelected} disabled={deleting} className="btn-secondary">
                 {deleting ? "Deleting…" : `Delete (${selectedIds.size})`}
               </button>
             ) : null}
-            <Link href="/bills/new" className="btn-secondary">New charge</Link>
+            <Link href="/bills/new" className="btn-secondary">New bill</Link>
           </div>
         </div>
         {message && (
@@ -264,10 +302,27 @@ export default function BillsPage() {
             {message.text}
           </div>
         )}
+        {blastReminderModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setBlastReminderModal(null)}>
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">Payment reminders</h3>
+              <p className="text-sm text-slate-600 mb-4">
+                {blastReminderModal.count} outstanding bill{blastReminderModal.count !== 1 ? "s" : ""} with customer emails. Copy addresses below to send reminders from your email client, or set up Resend API for in-app sending.
+              </p>
+              <textarea readOnly rows={6} className="input text-sm font-mono" value={blastReminderModal.emails.join(", ")} />
+              <div className="flex gap-2 mt-4">
+                <button type="button" onClick={() => { navigator.clipboard.writeText(blastReminderModal.emails.join(", ")); setMessage({ type: "success", text: "Copied to clipboard." }); setBlastReminderModal(null); }} className="btn-primary">
+                  Copy emails
+                </button>
+                <button type="button" onClick={() => setBlastReminderModal(null)} className="btn-secondary">Close</button>
+              </div>
+            </div>
+          </div>
+        )}
         {bills.length === 0 ? (
           <div className="card p-12 text-center">
-            <p className="text-slate-600 mb-4">No charges yet.</p>
-            <Link href="/bills/new" className="btn-primary inline-block">Create your first charge</Link>
+            <p className="text-slate-600 mb-4">No bills yet.</p>
+            <Link href="/bills/new" className="btn-primary inline-block">Create your first bill</Link>
           </div>
         ) : (
           <>
@@ -347,7 +402,7 @@ export default function BillsPage() {
                     <td className="p-3 text-slate-600">{b.description || "Invoice"}</td>
                     <td className="p-3 font-medium text-slate-900">{format(b.amount_cents)}</td>
                     <td className="p-3 text-slate-600">{b.due_date}</td>
-                    <td className="p-3"><StatusBadge status={b.status} /></td>
+                    <td className="p-3"><StatusBadge bill={b} /></td>
                     <td className="p-3 text-right">
                       {(() => {
                         const s = (b.status || "draft").toLowerCase();
@@ -435,7 +490,7 @@ export default function BillsPage() {
           </>
         )}
         <p className="mt-4 text-xs text-slate-500">
-          Draft charges must be <strong>Finalized</strong> before they are ready to send. Select one or more draft or finalized charges (same customer) and use <strong>Create invoice</strong> to add them to an invoice.
+          Draft bills must be <strong>Finalized</strong> before sending. Select bills (same customer) and use <strong>Create invoice</strong> to send.
         </p>
       </div>
     </main>

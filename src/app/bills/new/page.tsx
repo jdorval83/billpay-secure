@@ -1,23 +1,37 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { Customer } from "@/lib/supabase";
 
 export default function NewBillPage() {
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState("");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [recurringSchedule, setRecurringSchedule] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     fetch("/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers || []));
   }, []);
+  useEffect(() => {
+    const amt = searchParams?.get("amount");
+    const desc = searchParams?.get("description");
+    const days = searchParams?.get("dueDays");
+    if (amt) setAmount((Number(amt) / 100).toFixed(2));
+    if (desc) setDescription(decodeURIComponent(desc));
+    if (days) {
+      const d = new Date();
+      d.setDate(d.getDate() + parseInt(days, 10));
+      setDueDate(d.toISOString().split("T")[0]);
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +55,7 @@ export default function NewBillPage() {
           amount_cents: amountCents,
           description: description.trim() || "Invoice",
           due_date: dueDate,
+          recurring_schedule: recurringSchedule || undefined,
         }),
       });
       const data = await res.json();
@@ -70,7 +85,7 @@ export default function NewBillPage() {
   return (
     <main className="page-container">
       <div className="content-max max-w-md">
-        <h1 className="text-2xl font-bold text-slate-900 mb-6">New charge</h1>
+        <h1 className="text-2xl font-bold text-slate-900 mb-6">New bill</h1>
         <form onSubmit={handleSubmit} className="card p-6 space-y-4">
           {error && <p className="text-red-600 text-sm">{error}</p>}
           <div>
@@ -94,8 +109,18 @@ export default function NewBillPage() {
             <label className="label">Due Date *</label>
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input" required />
           </div>
-          <div className="flex gap-3 pt-2">
-            <button type="submit" disabled={loading} className="btn-primary">{loading ? "Creating…" : "Create charge"}</button>
+          <div>
+            <label className="label">Recurring (optional)</label>
+            <select value={recurringSchedule} onChange={(e) => setRecurringSchedule(e.target.value)} className="input">
+              <option value="">One-time</option>
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Biweekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+          <div className="flex flex-wrap gap-3 pt-2">
+            <button type="submit" disabled={loading} className="btn-primary">{loading ? "Creating…" : "Create bill"}</button>
+            <Link href="/templates" className="btn-secondary">Use template</Link>
             <Link href="/bills" className="btn-secondary">Cancel</Link>
           </div>
         </form>
