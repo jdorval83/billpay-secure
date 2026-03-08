@@ -10,17 +10,22 @@ export async function GET(request: Request) {
     .eq("business_id", businessId)
     .in("status", ["finalized", "billed", "sent"]);
 
-  const outstanding = (bills || [])
-    .filter((b: { balance_cents?: number }) => (b.balance_cents ?? 0) > 0)
-    .map((b: { id: string; balance_cents: number; due_date: string; description?: string; customers?: { name?: string; email?: string } | null }) => ({
-      billId: b.id,
-      customerName: (b.customers as { name?: string })?.name ?? "",
-      email: (b.customers as { email?: string })?.email ?? "",
-      amountCents: b.balance_cents,
-      dueDate: b.due_date,
-      description: b.description ?? "",
-    }))
-    .filter((r: { email: string }) => r.email);
+  const billList = (bills || []) as { id: string; balance_cents?: number; due_date: string; description?: string; customers?: { name?: string; email?: string } | { name?: string; email?: string }[] }[];
+  const outstanding = billList
+    .filter((b) => (b.balance_cents ?? 0) > 0)
+    .map((b) => {
+      const cust = Array.isArray(b.customers) ? b.customers[0] : b.customers;
+      const email = (cust as { email?: string } | undefined)?.email ?? "";
+      return {
+        billId: b.id,
+        customerName: (cust as { name?: string } | undefined)?.name ?? "",
+        email,
+        amountCents: b.balance_cents ?? 0,
+        dueDate: b.due_date,
+        description: b.description ?? "",
+      };
+    })
+    .filter((r) => r.email);
 
   return NextResponse.json({ outstanding });
 }
