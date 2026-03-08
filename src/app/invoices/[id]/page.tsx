@@ -99,25 +99,17 @@ export default async function InvoiceDetailPage({ params }: PageParams) {
                 <span className="font-medium text-slate-800">{business.name}</span>
               </p>
             ) : null}
-            {publicToken ? (
-              <p className="mt-2 text-xs text-slate-500">
-                Public link:{" "}
-                <Link
-                  href={`/public/invoices/${publicToken}`}
-                  className="text-emerald-600 hover:text-emerald-700 font-medium"
-                  target="_blank"
-                >
-                  open customer view
-                </Link>
-              </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a href={`/api/invoices/${id}/pdf`} className="btn-secondary">
+              Download PDF
+            </a>
+            {publicToken && invoice.status !== "paid" && invoice.status !== "void" ? (
+              <a href={`/api/public/invoices/${publicToken}/checkout`} className="btn-primary">
+                Pay now
+              </a>
             ) : null}
           </div>
-          <a
-            href={`/api/invoices/${id}/pdf`}
-            className="btn-secondary"
-          >
-            Download PDF
-          </a>
         </div>
 
         <div className="card p-8 space-y-8">
@@ -236,11 +228,14 @@ export default async function InvoiceDetailPage({ params }: PageParams) {
             </div>
           </div>
 
-          <p className="text-xs text-slate-500">
-            Online payment and customer-facing magic link views will appear here in
-            production tenants. This test environment shows the invoice layout we’ll
-            use when generating PDFs per business.
-          </p>
+          {publicToken && invoice.status !== "paid" && invoice.status !== "void" ? (
+            <p className="text-xs text-slate-500">
+              Share link:{" "}
+              <span className="font-mono text-slate-600 break-all">
+                {host ? `https://${host}` : ""}/public/invoices/{publicToken}
+              </span>
+            </p>
+          ) : null}
         </div>
       </div>
     </main>

@@ -25,16 +25,42 @@ export async function getBusinessIdForRequest(req: Request): Promise<string> {
 export async function getBusinessIdFromHost(host: string | null): Promise<string> {
   const slug = getTenantSlugFromHost(host);
 
-  const { data, error } = await supabaseAdmin
+  const { data: bySubdomain, error } = await supabaseAdmin
     .from("businesses")
-    .select("id")
+    .select("id, kind")
     .eq("subdomain", slug)
     .single();
 
-  if (error || !data) {
-    return process.env.DEFAULT_BUSINESS_ID || DEFAULT_BUSINESS_ID;
+  // Prefer tenant over platform: root domain "test" often maps to platform, but bills live under tenant
+  if (!error && bySubdomain) {
+    if (bySubdomain.kind === "tenant") {
+      return bySubdomain.id as string;
+    }
+    // Found platform business for "test" — use first tenant if one exists (single-tenant prod)
+    if (bySubdomain.kind === "platform") {
+      const { data: tenant } = await supabaseAdmin
+        .from("businesses")
+        .select("id")
+        .eq("kind", "tenant")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .single();
+      if (tenant) return tenant.id as string;
+    }
+    return bySubdomain.id as string;
   }
 
-  return data.id as string;
+  // Fallback: first tenant (e.g. www.billpaysecure.com when no "www" business)
+  const { data: first } = await supabaseAdmin
+    .from("businesses")
+    .select("id")
+    .eq("kind", "tenant")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (first) return first.id as string;
+
+  return process.env.DEFAULT_BUSINESS_ID || DEFAULT_BUSINESS_ID;
 }
 

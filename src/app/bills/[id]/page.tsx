@@ -28,6 +28,7 @@ function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     draft: "bg-amber-50 text-amber-700 border-amber-200",
     finalized: "bg-sky-50 text-sky-700 border-sky-200",
+    billed: "bg-slate-100 text-slate-700 border-slate-200",
     sent: "bg-indigo-50 text-indigo-700 border-indigo-200",
     paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
     written_off: "bg-rose-50 text-rose-700 border-rose-200",
@@ -95,8 +96,8 @@ export default function BillDetailPage() {
 
   const canFinalize = bill && (bill.status || "draft").toLowerCase() === "draft";
   const canMarkSent = bill && (bill.status || "").toLowerCase() === "finalized";
-  const canMarkPaid = bill && (bill.status || "").toLowerCase() === "sent";
-  const canWriteOff = bill && (bill.status || "").toLowerCase() === "sent";
+  const canMarkPaid = bill && ["sent", "billed"].includes((bill.status || "").toLowerCase());
+  const canWriteOff = bill && ["sent", "billed"].includes((bill.status || "").toLowerCase());
 
   const handleAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

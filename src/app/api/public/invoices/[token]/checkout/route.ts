@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getBusinessIdForRequest } from "@/lib/tenant";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const currency = process.env.STRIPE_CURRENCY || "usd";
@@ -24,7 +23,6 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
-  const businessId = await getBusinessIdForRequest(_request);
   const { token } = await params;
   if (!token) {
     return NextResponse.json({ error: "Token required" }, { status: 400 });
@@ -33,7 +31,6 @@ export async function GET(
   const { data: invoice, error } = await supabaseAdmin
     .from("invoices")
     .select("*")
-    .eq("business_id", businessId)
     .eq("public_token", token)
     .single();
 
@@ -44,7 +41,7 @@ export async function GET(
     );
   }
 
-  if (invoice.status === "paid" || invoice.status === "written_off") {
+  if (["paid", "written_off", "void"].includes(String(invoice.status || ""))) {
     return NextResponse.json(
       { error: "Invoice is not payable" },
       { status: 400 }
@@ -77,7 +74,7 @@ export async function GET(
     metadata: {
       invoice_id: invoice.id,
       public_token: token,
-      business_id: businessId,
+      business_id: invoice.business_id,
     },
   });
 
