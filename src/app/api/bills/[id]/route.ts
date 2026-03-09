@@ -26,7 +26,13 @@ export async function GET(
     return NextResponse.json({ error: "Bill not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ bill });
+  const { data: sendEvents } = await supabaseAdmin
+    .from("bill_send_events")
+    .select("id, sent_at, channel, recipient, status, error_message")
+    .eq("bill_id", id)
+    .order("sent_at", { ascending: false });
+
+  return NextResponse.json({ bill, sendEvents: sendEvents || [] });
 }
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {

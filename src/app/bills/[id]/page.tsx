@@ -23,6 +23,8 @@ type Bill = {
   customers?: { name?: string; email?: string; phone?: string } | null;
 };
 
+type SendEvent = { id: string; sent_at: string; channel: string | null; recipient: string | null; status: string | null; error_message: string | null };
+
 const STATUS_LABELS: Record<string, string> = {
   ready: "Ready",
   draft: "Ready",
@@ -57,6 +59,7 @@ export default function BillDetailPage() {
   const params = useParams();
   const id = params?.id as string | undefined;
   const [bill, setBill] = useState<Bill | null>(null);
+  const [sendEvents, setSendEvents] = useState<SendEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -72,6 +75,7 @@ export default function BillDetailPage() {
       .then((d) => {
         if (d.bill) {
           setBill(d.bill);
+          setSendEvents(d.sendEvents || []);
           setEditForm({
             amount: ((d.bill.amount_cents || 0) / 100).toFixed(2),
             description: d.bill.description || "",
@@ -87,6 +91,8 @@ export default function BillDetailPage() {
     "$" + (c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
   const formatDate = (s: string | null) =>
     s ? new Date(s).toLocaleDateString() : "—";
+  const formatDateTime = (s: string | null) =>
+    s ? new Date(s).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" }) : "—";
 
   const updateStatus = async (status: string, extra?: Record<string, unknown>) => {
     if (!bill) return;
@@ -118,6 +124,18 @@ export default function BillDetailPage() {
   const canMarkPaid = bill && ["billed", "past_due", "overdue", "finalized", "sent"].includes((bill.status || "").toLowerCase());
   const canResend = bill && ["billed", "past_due", "overdue", "finalized", "sent"].includes((bill.status || "").toLowerCase());
 
+  const refetchBill = () => {
+    if (!id) return;
+    fetch(`/api/bills/${id}`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.bill) {
+          setBill(d.bill);
+          setSendEvents(d.sendEvents || []);
+        }
+      });
+  };
+
   const handleResend = async () => {
     if (!bill) return;
     setBusy(true);
@@ -127,6 +145,7 @@ export default function BillDetailPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to resend");
       setMessage({ type: "success", text: data.message || "Payment link sent via text." });
+      refetchBill();
     } catch (e) {
       setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to resend" });
     } finally {
@@ -290,15 +309,15 @@ export default function BillDetailPage() {
                 {bill.sent_at && (
                   <>
                     <dt className="text-slate-500">First sent</dt>
-                    <dd className="font-medium text-slate-900">{formatDate(bill.first_sent_at)}</dd>
+                    <dd className="font-medium text-slate-900">{formatDateTime(bill.first_sent_at)}</dd>
                     <dt className="text-slate-500">Last sent</dt>
-                    <dd className="font-medium text-slate-900">{formatDate(bill.last_sent_at)}</dd>
+                    <dd className="font-medium text-slate-900">{formatDateTime(bill.last_sent_at)}</dd>
                   </>
                 )}
                 {bill.paid_at && (
                   <>
                     <dt className="text-slate-500">Paid at</dt>
-                    <dd className="font-medium text-slate-900">{formatDate(bill.paid_at)}</dd>
+                    <dd className="font-medium text-slate-900">{formatDateTime(bill.paid_at)}</dd>
                   </>
                 )}
                 {bill.written_off_at && (
@@ -408,6 +427,26 @@ export default function BillDetailPage() {
                 )}
               </div>
             </div>
+
+            {sendEvents.length > 0 && (
+              <div className="card p-6">
+                <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">
+                  Send history
+                </h2>
+                <ul className="space-y-2 text-sm">
+                  {sendEvents.map((e) => (
+                    <li key={e.id} className="flex flex-col gap-0.5 py-2 border-b border-slate-100 last:border-0">
+                      <span className="font-medium text-slate-900">{formatDateTime(e.sent_at)}</span>
+                      <span className="text-slate-600 text-xs">
+                        {e.channel || "—"}{e.recipient ? ` to ${e.recipient}` : ""}
+                        {e.status ? ` • ${e.status}` : ""}
+                        {e.error_message ? ` (${e.error_message})` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       </div>

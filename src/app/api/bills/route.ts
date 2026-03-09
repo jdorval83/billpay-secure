@@ -8,7 +8,8 @@ export async function GET(request: Request) {
   let pastDueDays = 0;
   try {
     const { data: biz } = await supabaseAdmin.from("businesses").select("past_due_days").eq("id", businessId).maybeSingle();
-    pastDueDays = Math.max(0, Math.min(365, (biz as { past_due_days?: number } | null)?.past_due_days ?? 0));
+    const raw = (biz as { past_due_days?: number | string } | null)?.past_due_days;
+    pastDueDays = Math.max(0, Math.min(365, parseInt(String(raw ?? 0), 10) || 0));
   } catch {
     // past_due_days column may not exist
   }
@@ -26,12 +27,14 @@ export async function GET(request: Request) {
   for (const b of bills) {
     const s = (b.status || "").toLowerCase();
     if (s === "billed" || s === "finalized" || s === "sent") {
-      const due = new Date(b.due_date + "T00:00:00");
-      due.setDate(due.getDate() + pastDueDays);
-      const cutoff = due.toISOString().slice(0, 10);
-      if (today > cutoff) {
-        await supabaseAdmin.from("bills").update({ status: "past_due" }).eq("id", b.id).eq("business_id", b.business_id);
-        (b as { status: string }).status = "past_due";
+      const [y, m, d] = (b.due_date || "").split("-").map((x) => parseInt(x, 10) || 0);
+      if (y && m && d) {
+        const cutoffDate = new Date(Date.UTC(y, m - 1, d + pastDueDays));
+        const cutoff = cutoffDate.toISOString().slice(0, 10);
+        if (today > cutoff) {
+          await supabaseAdmin.from("bills").update({ status: "past_due" }).eq("id", b.id).eq("business_id", b.business_id);
+          (b as { status: string }).status = "past_due";
+        }
       }
     }
   }

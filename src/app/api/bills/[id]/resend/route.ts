@@ -28,7 +28,7 @@ export async function POST(
 
     const { data: bill, error: billErr } = await supabaseAdmin
       .from("bills")
-      .select("id, balance_cents, due_date, description, business_id, customers(name, phone, sms_consent_at)")
+      .select("id, balance_cents, due_date, description, business_id, customer_id, customers(name, phone, sms_consent_at)")
       .eq("id", id)
       .eq("business_id", businessId)
       .maybeSingle();
@@ -103,11 +103,23 @@ export async function POST(
     });
 
     const nowIso = new Date().toISOString();
+    const billCustomerId = (bill as { customer_id?: string }).customer_id;
     await supabaseAdmin
       .from("bills")
       .update({ last_sent_at: nowIso, sent_at: nowIso })
       .eq("id", id)
       .eq("business_id", businessId);
+    if (billCustomerId) {
+      await supabaseAdmin.from("bill_send_events").insert({
+        business_id: businessId,
+        bill_id: id,
+        customer_id: billCustomerId,
+        sent_at: nowIso,
+        channel: "sms",
+        recipient: phone,
+        status: "sent",
+      });
+    }
 
     return NextResponse.json({ success: true, message: "Payment link sent via text." });
   } catch (err) {
