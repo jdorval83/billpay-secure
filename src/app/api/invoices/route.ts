@@ -136,6 +136,17 @@ export async function POST(request: Request) {
         first_sent_at: nowIso,
         last_sent_at: nowIso,
       }).in("id", billIds).eq("business_id", businessId);
+      const sendEventRows = billIds.map((billId: string) => ({
+        business_id: businessId,
+        bill_id: billId,
+        invoice_id: invoice.id,
+        customer_id: customerId,
+        sent_at: nowIso,
+        channel: "invoice",
+        recipient: null,
+        status: "sent",
+      }));
+      await supabaseAdmin.from("bill_send_events").insert(sendEventRows);
     }
 
     const lineItemRows = baseLineItems.map((item: { description: string; quantity?: number; unitPriceCents?: number; amountCents: number; sortOrder?: number; sourceType?: string; sourceId?: string }, index: number) => ({
@@ -175,16 +186,19 @@ export async function POST(request: Request) {
           to: normalizePhone(custPhone),
         });
 
-        const nowIso = new Date().toISOString();
-        await supabaseAdmin.from("bill_send_events").insert({
+        const smsSentAt = new Date().toISOString();
+        // Update bill_send_events for each bill: change channel to sms (replace invoice row) or insert new
+        const smsEventRows = billIds.map((billId: string) => ({
           business_id: businessId,
+          bill_id: billId,
           invoice_id: invoice.id,
           customer_id: customerId,
-          sent_at: nowIso,
+          sent_at: smsSentAt,
           channel: "sms",
           recipient: custPhone,
           status: "sent",
-        });
+        }));
+        await supabaseAdmin.from("bill_send_events").insert(smsEventRows);
         await supabaseAdmin.from("invoices").update({ status: "sent" }).eq("id", invoice.id);
       } catch {
         // Don't fail the request if SMS fails; bill was created successfully

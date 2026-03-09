@@ -306,14 +306,6 @@ export default function BillDetailPage() {
                 </dd>
                 <dt className="text-slate-500">Created</dt>
                 <dd className="font-medium text-slate-900">{formatDate(bill.created_at)}</dd>
-                {bill.sent_at && (
-                  <>
-                    <dt className="text-slate-500">First sent</dt>
-                    <dd className="font-medium text-slate-900">{formatDateTime(bill.first_sent_at)}</dd>
-                    <dt className="text-slate-500">Last sent</dt>
-                    <dd className="font-medium text-slate-900">{formatDateTime(bill.last_sent_at)}</dd>
-                  </>
-                )}
                 {bill.paid_at && (
                   <>
                     <dt className="text-slate-500">Paid at</dt>
@@ -428,25 +420,32 @@ export default function BillDetailPage() {
               </div>
             </div>
 
-            {sendEvents.length > 0 && (
-              <div className="card p-6">
-                <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">
-                  Send history
-                </h2>
-                <ul className="space-y-2 text-sm">
-                  {sendEvents.map((e) => (
-                    <li key={e.id} className="flex flex-col gap-0.5 py-2 border-b border-slate-100 last:border-0">
-                      <span className="font-medium text-slate-900">{formatDateTime(e.sent_at)}</span>
-                      <span className="text-slate-600 text-xs">
-                        {e.channel || "—"}{e.recipient ? ` to ${e.recipient}` : ""}
-                        {e.status ? ` • ${e.status}` : ""}
-                        {e.error_message ? ` (${e.error_message})` : ""}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <div className="card p-6">
+              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">
+                Send history
+              </h2>
+              {sendEvents.length > 0 ? (
+                <>
+                  <p className="text-xs text-slate-500 mb-3">
+                    First sent: {formatDateTime(sendEvents[sendEvents.length - 1]?.sent_at ?? null)} · Last sent: {formatDateTime(sendEvents[0]?.sent_at ?? null)}
+                  </p>
+                  <ul className="space-y-2 text-sm">
+                    {sendEvents.map((e) => (
+                      <li key={e.id} className="flex flex-col gap-0.5 py-2 border-b border-slate-100 last:border-0">
+                        <span className="font-medium text-slate-900">{formatDateTime(e.sent_at)}</span>
+                        <span className="text-slate-600 text-xs">
+                          {e.channel || "—"}{e.recipient ? ` to ${e.recipient}` : ""}
+                          {e.status ? ` • ${e.status}` : ""}
+                          {e.error_message ? ` (${e.error_message})` : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="text-sm text-slate-500">No send history yet.</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
