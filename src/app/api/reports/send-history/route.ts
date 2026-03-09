@@ -18,19 +18,25 @@ export async function GET(request: Request) {
   if (to) query = query.lte("sent_at", to);
   const { data, error } = await query;
   if (error) return new NextResponse(error.message, { status: 500 });
-  const rows = (data || []).map((e: { bill_id?: string; invoice_id?: string; customer_id?: string; sent_at?: string; channel?: string; recipient?: string; status?: string; message_id?: string; error_message?: string; bills?: { description?: string } | null; customers?: { name?: string } | null }) => ({
-    sentAt: e.sent_at,
-    channel: e.channel,
-    recipient: e.recipient,
-    status: e.status,
-    billId: e.bill_id,
-    billDescription: (e.bills as { description?: string } | null)?.description ?? "",
-    customerName: (e.customers as { name?: string } | null)?.name ?? "",
-    customerId: e.customer_id,
-    invoiceId: e.invoice_id,
-    messageId: e.message_id,
-    errorMessage: e.error_message,
-  }));
+  const rows = (data || []).map((e: Record<string, unknown>) => {
+    const bills = e.bills as { description?: string }[] | { description?: string } | null | undefined;
+    const customers = e.customers as { name?: string }[] | { name?: string } | null | undefined;
+    const billDesc = Array.isArray(bills) ? bills[0]?.description : bills?.description;
+    const custName = Array.isArray(customers) ? customers[0]?.name : customers?.name;
+    return {
+      sentAt: e.sent_at,
+      channel: e.channel,
+      recipient: e.recipient,
+      status: e.status,
+      billId: e.bill_id,
+      billDescription: billDesc ?? "",
+      customerName: custName ?? "",
+      customerId: e.customer_id,
+      invoiceId: e.invoice_id,
+      messageId: e.message_id,
+      errorMessage: e.error_message,
+    };
+  });
   return new NextResponse(toCsv(rows), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
