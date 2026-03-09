@@ -298,7 +298,7 @@ export default function BillDetailPage() {
                     disabled={busy}
                     className="btn-primary w-full"
                   >
-                    {busy ? "Updating…" : "Mark sent"}
+                    {busy ? "Sending…" : "Send"}
                   </button>
                 )}
                 {canMarkPaid && (
@@ -308,7 +308,7 @@ export default function BillDetailPage() {
                     disabled={busy}
                     className="btn-primary w-full"
                   >
-                    {busy ? "Updating…" : "Mark paid"}
+                    {busy ? "Updating…" : "Mark as Paid"}
                   </button>
                 )}
                 {canWriteOff && (

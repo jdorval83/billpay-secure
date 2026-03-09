@@ -66,27 +66,28 @@ export default function DashboardPage() {
   }, []);
 
   const weeklyDataComputed = useMemo(() => {
-    if (!chartFrom || !chartTo || bills.length === 0) return [];
-    const start = new Date(chartFrom + "T00:00:00").getTime();
-    const end = new Date(chartTo + "T23:59:59").getTime();
-    const weekBuckets: Record<string, { charges: number; payments: number }> = {};
+    if (!chartFrom || !chartTo) return [];
+    const startMs = new Date(chartFrom + "T00:00:00").getTime();
+    const endMs = new Date(chartTo + "T23:59:59").getTime();
     const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-    for (let t = start; t <= end; t += msPerWeek) {
-      const d = new Date(t);
-      const key = d.toISOString().slice(0, 10);
+    const weekBuckets: Record<string, { charges: number; payments: number }> = {};
+    for (let t = startMs; t <= endMs; t += msPerWeek) {
+      const key = new Date(t).toISOString().slice(0, 10);
       weekBuckets[key] = { charges: 0, payments: 0 };
     }
     bills.forEach((b) => {
       const created = b.created_at ? new Date(b.created_at).getTime() : 0;
-      if (created >= start && created <= end) {
-        const weekStart = new Date(Math.floor(created / msPerWeek) * msPerWeek);
+      if (created >= startMs && created <= endMs) {
+        const weekIdx = Math.floor((created - startMs) / msPerWeek);
+        const weekStart = new Date(startMs + weekIdx * msPerWeek);
         const key = weekStart.toISOString().slice(0, 10);
         if (weekBuckets[key]) weekBuckets[key].charges += b.amount_cents || 0;
       }
       if ((b.status || "").toLowerCase() === "paid" && b.paid_at) {
         const paid = new Date(b.paid_at).getTime();
-        if (paid >= start && paid <= end) {
-          const weekStart = new Date(Math.floor(paid / msPerWeek) * msPerWeek);
+        if (paid >= startMs && paid <= endMs) {
+          const weekIdx = Math.floor((paid - startMs) / msPerWeek);
+          const weekStart = new Date(startMs + weekIdx * msPerWeek);
           const key = weekStart.toISOString().slice(0, 10);
           if (weekBuckets[key]) weekBuckets[key].payments += b.amount_cents || 0;
         }
@@ -106,7 +107,7 @@ export default function DashboardPage() {
 
   const { unpaid, paid, totalOutstanding, agingByWeek } = useMemo(() => {
     const unpaidBills = bills.filter((b) => (b.balance_cents ?? 0) > 0 && (b.status || "").toLowerCase() !== "void");
-    const paidBills = bills.filter((b) => (b.balance_cents ?? 0) <= 0 || (b.status || "").toLowerCase() === "paid");
+    const paidBills = bills.filter((b) => (b.status || "").toLowerCase() === "paid");
     const total = unpaidBills.reduce((sum, b) => sum + (b.balance_cents ?? 0), 0);
     const today = new Date();
     const aging = AGING_WEEKS.map(({ label, minDays, maxDays }) => {
@@ -248,12 +249,12 @@ export default function DashboardPage() {
             </div>
           </div>
           {weeklyDataComputed.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={weeklyDataComputed.map((w) => ({ ...w, chargesD: w.charges / 100, paymentsD: w.payments / 100 }))} margin={{ top: 12, right: 12, left: 12, bottom: 12 }}>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={weeklyDataComputed.map((w) => ({ ...w, chargesD: w.charges / 100, paymentsD: w.payments / 100 }))} margin={{ top: 16, right: 16, left: 16, bottom: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="week" tick={{ fontSize: 10 }} tickFormatter={(v) => v?.slice(5) || v} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + (v >= 1000 ? (v / 1000) + "k" : v)} allowDecimals={false} />
-                <Tooltip formatter={(v: number, name: string) => ["$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2 }), name === "chargesD" ? "Charges" : "Payments"]} labelFormatter={(_, payload) => payload?.[0]?.payload?.label || ""} />
+                <XAxis dataKey="week" tick={{ fontSize: 11 }} tickFormatter={(v) => (v ? `${v.slice(5, 7)}/${v.slice(8, 10)}` : "")} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + (v >= 1000 ? (v / 1000) + "k" : String(v))} allowDecimals={false} domain={["auto", "auto"]} width={52} />
+                <Tooltip formatter={(v: number, n: string) => [typeof v === "number" ? "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2 }) : v, n === "chargesD" ? "Charges" : "Payments"]} contentStyle={{ fontSize: 13 }} labelFormatter={(_, items) => (items?.[0]?.payload?.label as string) || ""} />
                 <Line type="monotone" dataKey="chargesD" name="Charges" stroke="#475569" strokeWidth={2} dot={{ r: 4 }} />
                 <Line type="monotone" dataKey="paymentsD" name="Payments" stroke="#059669" strokeWidth={2} dot={{ r: 4 }} />
               </LineChart>

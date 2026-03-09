@@ -57,7 +57,6 @@ function BillsPageContent() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [statusChangingId, setStatusChangingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -164,7 +163,7 @@ function BillsPageContent() {
     });
   };
 
-  const selectableOnPage = paginatedBills.filter((b) => canSelectForInvoice(b) || ["finalized", "sent", "billed"].includes((b.status || "").toLowerCase()));
+  const selectableOnPage = paginatedBills;
   const allSelectedOnPage = selectableOnPage.length > 0 && selectableOnPage.every((b) => selectedIds.has(b.id));
   const toggleSelectAll = () => {
     if (allSelectedOnPage) {
@@ -186,45 +185,6 @@ function BillsPageContent() {
   const sameCustomer = selectedBills.length > 0 && selectedBills.every((b) => b.customer_id === selectedBills[0].customer_id);
   const canCreateInvoice = selectedBills.length > 0 && sameCustomer;
   const canDelete = selectedBills.length > 0;
-
-  const updateStatus = async (bill: Bill, status: string, extraBody?: Record<string, unknown>) => {
-    setStatusChangingId(bill.id);
-    setMessage(null);
-    try {
-      const res = await fetch(`/api/bills/${bill.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, ...(extraBody || {}) }),
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update bill");
-      let text = "";
-      if (status === "billed") text = "Bill marked as sent.";
-      else if (status === "paid") text = "Bill marked as paid.";
-      else if (status === "written_off") text = "Bill written off.";
-      else text = "Bill updated.";
-      setMessage({ type: "success", text });
-      fetchBills();
-    } catch (e) {
-      setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to update bill" });
-    } finally {
-      setStatusChangingId(null);
-    }
-  };
-
-  const handleMarkSent = async (bill: Bill) => {
-    await updateStatus(bill, "billed");
-  };
-
-  const handleMarkPaid = async (bill: Bill) => {
-    await updateStatus(bill, "paid");
-  };
-
-  const handleWriteOff = async (bill: Bill) => {
-    const reason = window.prompt("Reason for write-off (optional):", "Bad debt");
-    await updateStatus(bill, "written_off", { writeoffReason: reason ?? null });
-  };
 
   const handleBulkStatus = async (status: string, writeoffReason?: string | null) => {
     const ids = selectedBills.map((b) => b.id);
@@ -354,16 +314,6 @@ function BillsPageContent() {
                 {blastReminderLoading ? "Loading…" : `Remind all (${outstandingCount})`}
               </button>
             )}
-            {canCreateInvoice ? (
-              <button type="button" onClick={handleCreateInvoice} disabled={creatingInvoice} className="btn-primary">
-                {creatingInvoice ? "Creating…" : `Create invoice (${selectedIds.size})`}
-              </button>
-            ) : null}
-            {canDelete ? (
-              <button type="button" onClick={handleDeleteSelected} disabled={deleting} className="btn-secondary">
-                {deleting ? "Deleting…" : `Delete (${selectedIds.size})`}
-              </button>
-            ) : null}
             <Link href="/bills/new" className="btn-secondary">New bill</Link>
           </div>
         </div>
@@ -503,25 +453,26 @@ function BillsPageContent() {
               <div className="flex flex-wrap items-center gap-2 mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
                 <span className="text-sm font-medium text-slate-700">{selectedBills.length} selected</span>
                 {selectedBills.some((b) => ["ready", "draft", "finalized"].includes((b.status || "").toLowerCase())) && (
-                  <button type="button" onClick={() => handleBulkStatus("billed")} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5">
-                    {bulkActionLoading ? "Updating…" : "Mark sent all"}
+                  <button
+                    type="button"
+                    onClick={canCreateInvoice ? handleCreateInvoice : () => handleBulkStatus("billed")}
+                    disabled={creatingInvoice || bulkActionLoading}
+                    className="btn-primary text-sm py-1.5"
+                  >
+                    {(creatingInvoice || bulkActionLoading) ? "Sending…" : "SEND BILL"}
                   </button>
                 )}
                 {selectedBills.every((b) => ["finalized", "sent", "billed"].includes((b.status || "").toLowerCase())) && (
-                  <>
-                    <button type="button" onClick={() => handleBulkStatus("paid")} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5">
-                      {bulkActionLoading ? "Updating…" : "Mark paid all"}
-                    </button>
-                    <button type="button" onClick={() => handleBulkStatus("written_off", window.prompt("Reason (optional):") ?? undefined)} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5 text-rose-700">
-                      {bulkActionLoading ? "Updating…" : "Write off all"}
-                    </button>
-                  </>
-                )}
-                {canCreateInvoice && (
-                  <button type="button" onClick={handleCreateInvoice} disabled={creatingInvoice} className="btn-primary text-sm py-1.5">
-                    {creatingInvoice ? "Creating…" : "Create invoice"}
+                  <button type="button" onClick={() => handleBulkStatus("paid")} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5">
+                    {bulkActionLoading ? "Updating…" : "Mark as Paid"}
                   </button>
                 )}
+                <button type="button" onClick={() => selectedBills.length === 1 && router.push(`/bills/${selectedBills[0].id}`)} disabled={selectedBills.length !== 1} className="btn-secondary text-sm py-1.5" title={selectedBills.length === 1 ? "Edit" : "Select one to edit"}>
+                  EDIT
+                </button>
+                <button type="button" onClick={handleDeleteSelected} disabled={deleting} className="btn-secondary text-sm py-1.5 text-rose-700">
+                  {deleting ? "Deleting…" : "DELETE"}
+                </button>
                 <button type="button" onClick={() => setSelectedIds(new Set())} className="text-sm text-slate-500 hover:text-slate-700">
                   Clear
                 </button>
@@ -543,12 +494,11 @@ function BillsPageContent() {
                   <th className="text-left p-3 text-sm font-semibold text-slate-700">Amount</th>
                   <th className="text-left p-3 text-sm font-semibold text-slate-700">Due</th>
                   <th className="text-left p-3 text-sm font-semibold text-slate-700">Status</th>
-                  <th className="w-28 p-3 text-right text-sm font-semibold text-slate-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredBills.length === 0 ? (
-                  <tr><td colSpan={7} className="p-6 text-center text-slate-500">No charges match your search.</td></tr>
+                  <tr><td colSpan={6} className="p-6 text-center text-slate-500">No charges match your search.</td></tr>
                 ) : (
                 paginatedBills.map((b) => (
                   <tr
@@ -571,47 +521,6 @@ function BillsPageContent() {
                     <td className="p-3 font-medium text-slate-900">{format(b.amount_cents)}</td>
                     <td className="p-3 text-slate-600">{b.due_date}</td>
                     <td className="p-3"><StatusBadge bill={b} /></td>
-                    <td className="p-3 text-right">
-                      {(() => {
-                        const s = (b.status || "draft").toLowerCase();
-                        const isBusy = statusChangingId === b.id;
-                        if (s === "draft" || s === "ready" || s === "finalized") {
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => handleMarkSent(b)}
-                              disabled={isBusy}
-                              className="text-sm font-medium text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
-                            >
-                              {statusChangingId === b.id ? "Marking sent…" : "Mark sent"}
-                            </button>
-                          );
-                        }
-                        if (s === "sent" || s === "billed") {
-                          return (
-                            <div className="flex justify-end gap-3" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                type="button"
-                                onClick={() => handleMarkPaid(b)}
-                                disabled={isBusy}
-                                className="text-sm font-medium text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
-                              >
-                                {statusChangingId === b.id ? "Updating…" : "Mark paid"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleWriteOff(b)}
-                                disabled={isBusy}
-                                className="text-sm font-medium text-rose-600 hover:text-rose-700 disabled:opacity-50"
-                              >
-                                {statusChangingId === b.id ? "Updating…" : "Write off"}
-                              </button>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </td>
                   </tr>
                 ))
                 )}
@@ -646,7 +555,7 @@ function BillsPageContent() {
           </>
         )}
         <p className="mt-4 text-xs text-slate-500">
-          Select Ready bills (same customer) and use <strong>Create invoice</strong> to send, or <strong>Mark sent</strong> to mark individually.
+          Select charges, then use the buttons above: <strong>SEND BILL</strong>, <strong>EDIT</strong>, <strong>DELETE</strong>, <strong>Mark as Paid</strong>.
         </p>
       </div>
     </main>
