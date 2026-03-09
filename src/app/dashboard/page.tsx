@@ -14,6 +14,7 @@ type Bill = {
   description: string;
   status: string;
   created_at?: string;
+  paid_at?: string | null;
   customers?: { name?: string | null } | null;
 };
 
@@ -35,6 +36,12 @@ export default function DashboardPage() {
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
   const [recordPaymentSubmitting, setRecordPaymentSubmitting] = useState(false);
+  const [chartFrom, setChartFrom] = useState(() => {
+    const s = new Date();
+    s.setDate(s.getDate() - 28);
+    return s.toISOString().slice(0, 10);
+  });
+  const [chartTo, setChartTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [weeklyData, setWeeklyData] = useState<WeekData[]>([]);
   const [selectedAgingBills, setSelectedAgingBills] = useState<{ label: string; bills: Bill[] } | null>(null);
   const [recordPaymentForm, setRecordPaymentForm] = useState({
@@ -49,22 +56,61 @@ export default function DashboardPage() {
   const recordPaymentRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    const now = new Date();
-    const to = now.toISOString().slice(0, 10);
-    const from = new Date(now);
-    from.setDate(from.getDate() - 28);
-    const fromStr = from.toISOString().slice(0, 10);
     Promise.all([
       fetch("/api/customers", { credentials: "include" }).then((r) => r.json()),
       fetch("/api/bills", { credentials: "include" }).then((r) => r.json()).catch(() => ({ bills: [] })),
-      fetch(`/api/dashboard/stats?from=${fromStr}&to=${to}`, { credentials: "include" }).then((r) => r.json()).catch(() => ({ byWeek: [] })),
-    ]).then(([cRes, bRes, statsRes]) => {
+    ]).then(([cRes, bRes]) => {
       setCustomers(cRes.customers || []);
       setBills(bRes.bills || []);
-      setWeeklyData(statsRes?.byWeek || []);
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    if (!chartFrom || !chartTo) return;
+    fetch(`/api/dashboard/stats?from=${chartFrom}&to=${chartTo}`, { credentials: "include" })
+      .then((r) => r.json())
+      .catch(() => null)
+      .then((statsRes) => {
+        const apiWeeks = statsRes?.byWeek || [];
+        if (apiWeeks.length > 0) {
+          setWeeklyData(apiWeeks);
+        } else if (bills.length > 0) {
+          const start = new Date(chartFrom + "T00:00:00").getTime();
+          const end = new Date(chartTo + "T23:59:59").getTime();
+          const weekBuckets: Record<string, { charges: number; payments: number }> = {};
+          for (let t = start; t <= end; t += 7 * 24 * 60 * 60 * 1000) {
+            const d = new Date(t);
+            const key = d.toISOString().slice(0, 10);
+            weekBuckets[key] = { charges: 0, payments: 0 };
+          }
+          bills.forEach((b) => {
+            const created = b.created_at ? new Date(b.created_at).getTime() : 0;
+            if (created >= start && created <= end) {
+              const weekStart = new Date(Math.floor(created / (7 * 24 * 60 * 60 * 1000)) * (7 * 24 * 60 * 60 * 1000));
+              const key = weekStart.toISOString().slice(0, 10);
+              if (weekBuckets[key]) weekBuckets[key].charges += b.amount_cents || 0;
+            }
+            if ((b.status || "").toLowerCase() === "paid" && b.paid_at) {
+              const paid = new Date(b.paid_at).getTime();
+              if (paid >= start && paid <= end) {
+                const weekStart = new Date(Math.floor(paid / (7 * 24 * 60 * 60 * 1000)) * (7 * 24 * 60 * 60 * 1000));
+                const key = weekStart.toISOString().slice(0, 10);
+                if (weekBuckets[key]) weekBuckets[key].payments += b.amount_cents || 0;
+              }
+            }
+          });
+          const weeks = Object.entries(weekBuckets)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([week, { charges, payments }]) => {
+              const wEnd = new Date(week);
+              wEnd.setDate(wEnd.getDate() + 6);
+              return { week, label: `${week} – ${wEnd.toISOString().slice(0, 10)}`, charges, payments };
+            });
+          setWeeklyData(weeks);
+        }
+      });
+  }, [chartFrom, chartTo, bills]);
 
   const formatMoney = (cents: number) =>
     "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
@@ -186,9 +232,33 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {weeklyData.length > 0 && (
-          <div className="card p-6 mb-8">
-            <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Weekly charges vs payments</h2>
+        <div className="card p-6 mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Weekly charges vs payments</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-slate-600">From</span>
+                <input type="date" value={chartFrom} onChange={(e) => setChartFrom(e.target.value)} className="input py-1.5 text-sm w-36" />
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-slate-600">To</span>
+                <input type="date" value={chartTo} onChange={(e) => setChartTo(e.target.value)} className="input py-1.5 text-sm w-36" />
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  const s = new Date();
+                  s.setDate(s.getDate() - 28);
+                  setChartFrom(s.toISOString().slice(0, 10));
+                  setChartTo(new Date().toISOString().slice(0, 10));
+                }}
+                className="text-sm text-slate-500 hover:text-slate-700"
+              >
+                Last 4 weeks
+              </button>
+            </div>
+          </div>
+          {weeklyData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={weeklyData.map((w) => ({ ...w, chargesD: w.charges / 100, paymentsD: w.payments / 100 }))} margin={{ top: 12, right: 12, left: 12, bottom: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -199,8 +269,10 @@ export default function DashboardPage() {
                 <Line type="monotone" dataKey="paymentsD" name="Payments" stroke="#059669" strokeWidth={2} dot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
-          </div>
-        )}
+          ) : (
+            <p className="text-sm text-slate-500 py-8 text-center">No data for this range. Try a different date range.</p>
+          )}
+        </div>
 
         <div className="card p-6 mb-8">
           <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Aging by week (outstanding)</h2>

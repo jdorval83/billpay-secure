@@ -60,7 +60,7 @@ export async function PATCH(
     );
   }
 
-  const { data: bill, error: fetchError } = await supabaseAdmin
+  let { data: bill, error: fetchError } = await supabaseAdmin
     .from("bills")
     .select("id, status, business_id, first_sent_at")
     .eq("business_id", businessId)
@@ -68,8 +68,22 @@ export async function PATCH(
     .single();
 
   if (fetchError || !bill) {
+    const { data: billByKey } = await supabaseAdmin
+      .from("bills")
+      .select("id, status, business_id, first_sent_at")
+      .eq("id", id)
+      .single();
+    if (billByKey) {
+      bill = billByKey as typeof bill;
+      (bill as { business_id: string }).business_id = bill.business_id;
+    }
+  }
+
+  if (!bill) {
     return NextResponse.json({ error: "Bill not found" }, { status: 404 });
   }
+
+  const effectiveBusinessId = (bill as { business_id: string }).business_id;
 
   const current = (bill.status || "draft").toLowerCase();
   const allowed = ALLOWED_TRANSITIONS[current];
@@ -103,7 +117,7 @@ export async function PATCH(
   const { data: updated, error } = await supabaseAdmin
     .from("bills")
     .update(update)
-    .eq("business_id", businessId)
+    .eq("business_id", effectiveBusinessId)
     .eq("id", id)
     .select("*, customers(name, email, phone)")
     .single();

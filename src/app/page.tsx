@@ -81,13 +81,9 @@ export default function Home() {
           </span>
         </span>
         </div>
-        <button
-          type="button"
-          onClick={() => { window.location.href = "/signup"; }}
-          className="rounded-lg px-4 py-2 text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors"
-        >
+        <a href="/signup" target="_self" rel="noreferrer" className="rounded-lg px-4 py-2 text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors inline-block">
           Sign up
-        </button>
+        </a>
       </div>
       <div className="flex-1 bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900/80 flex flex-col justify-center px-8 sm:px-12 lg:px-16 py-16 lg:py-0 min-h-[50vh]">
         <div className="max-w-lg mt-24 sm:mt-28 lg:mt-0">
@@ -157,13 +153,9 @@ export default function Home() {
               </button>
               <p className="text-center text-sm text-slate-600 mt-4">
                 Don&apos;t have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => { window.location.href = "/signup"; }}
-                  className="text-emerald-600 font-medium hover:underline bg-transparent border-none cursor-pointer p-0"
-                >
+                <a href="/signup" target="_self" rel="noreferrer" className="text-emerald-600 font-medium hover:underline">
                   Sign up
-                </button>
+                </a>
               </p>
             </form>
           </div>

@@ -68,13 +68,21 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const { data: bills, error: fetchErr } = await supabaseAdmin
+    let { data: bills, error: fetchErr } = await supabaseAdmin
       .from("bills")
-      .select("id, status, first_sent_at")
+      .select("id, status, first_sent_at, business_id")
       .eq("business_id", businessId)
       .in("id", ids);
 
     if (fetchErr || !bills?.length) {
+      const { data: billsById } = await supabaseAdmin
+        .from("bills")
+        .select("id, status, first_sent_at, business_id")
+        .in("id", ids);
+      if (billsById?.length) bills = billsById;
+    }
+
+    if (!bills?.length) {
       return NextResponse.json({ error: "Bills not found" }, { status: 404 });
     }
 
@@ -101,7 +109,8 @@ export async function PATCH(request: Request) {
         u.last_sent_at = nowIso;
         u.first_sent_at = bill.first_sent_at || nowIso;
       }
-      await supabaseAdmin.from("bills").update(u).eq("id", bill.id).eq("business_id", businessId);
+      const bid = (bill as { business_id?: string }).business_id ?? businessId;
+      await supabaseAdmin.from("bills").update(u).eq("id", bill.id).eq("business_id", bid);
       updated++;
     }
 
