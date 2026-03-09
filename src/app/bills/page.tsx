@@ -63,6 +63,8 @@ function BillsPageContent() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [customerFilter, setCustomerFilter] = useState("");
+  const [showFilter, setShowFilter] = useState<"outstanding" | "paid" | "written_off">("outstanding");
   const [recurringFilter, setRecurringFilter] = useState("");
   const [page, setPage] = useState(1);
   const [showAll, setShowAll] = useState(false);
@@ -78,6 +80,14 @@ function BillsPageContent() {
 
   const filteredBills = useMemo(() => {
     let out = bills;
+    if (customerFilter) out = out.filter((b) => b.customer_id === customerFilter);
+    if (showFilter === "outstanding") {
+      out = out.filter((b) => (b.balance_cents ?? 0) > 0 && !["paid", "written_off", "void"].includes((b.status || "").toLowerCase()));
+    } else if (showFilter === "paid") {
+      out = out.filter((b) => (b.status || "").toLowerCase() === "paid");
+    } else if (showFilter === "written_off") {
+      out = out.filter((b) => (b.status || "").toLowerCase() === "written_off");
+    }
     const q = search.trim().toLowerCase();
     if (q) {
       out = out.filter(
@@ -102,7 +112,7 @@ function BillsPageContent() {
     if (recurringFilter === "__none") out = out.filter((b) => !b.recurring_schedule);
     else if (recurringFilter) out = out.filter((b) => (b.recurring_schedule || "").toLowerCase() === recurringFilter);
     return out;
-  }, [bills, search, dateFrom, dateTo, statusFilter, recurringFilter]);
+  }, [bills, search, dateFrom, dateTo, statusFilter, recurringFilter, customerFilter, showFilter]);
 
   const paginatedBills = useMemo(() => {
     if (showAll) return filteredBills;
@@ -111,7 +121,7 @@ function BillsPageContent() {
   }, [filteredBills, page, showAll]);
 
   const totalPages = Math.ceil(filteredBills.length / PAGE_SIZE);
-  const hasFilters = search.trim() || dateFrom || dateTo || statusFilter || recurringFilter;
+  const hasFilters = search.trim() || dateFrom || dateTo || statusFilter || recurringFilter || customerFilter || showFilter !== "outstanding";
 
   const fetchBills = () => {
     fetch("/api/bills")
@@ -126,7 +136,12 @@ function BillsPageContent() {
 
   useEffect(() => {
     const q = searchParams?.get("search");
-    if (q) setSearch(q);
+    if (q != null) setSearch(q || "");
+    const cust = searchParams?.get("customer");
+    if (cust) setCustomerFilter(cust);
+    const show = searchParams?.get("show");
+    if (show === "paid" || show === "written_off") setShowFilter(show);
+    else if (cust) setShowFilter("outstanding");
   }, [searchParams]);
 
   useEffect(() => {
@@ -462,6 +477,13 @@ function BillsPageContent() {
                 placeholder="To"
                 className="input w-36"
               />
+              {customerFilter && (
+                <select value={showFilter} onChange={(e) => { setShowFilter(e.target.value as "outstanding" | "paid" | "written_off"); setPage(1); }} className="input w-36">
+                  <option value="outstanding">Outstanding only</option>
+                  <option value="paid">Paid</option>
+                  <option value="written_off">Written off</option>
+                </select>
+              )}
               <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="input w-32">
                 <option value="">All statuses</option>
                 <option value="draft">Draft</option>
@@ -490,7 +512,10 @@ function BillsPageContent() {
               {hasFilters && (
                 <button
                   type="button"
-                  onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setStatusFilter(""); setRecurringFilter(""); setPage(1); }}
+                  onClick={() => {
+                    setSearch(""); setDateFrom(""); setDateTo(""); setStatusFilter(""); setRecurringFilter(""); setCustomerFilter(""); setShowFilter("outstanding"); setPage(1);
+                    if (customerFilter) router.replace("/bills");
+                  }}
                   className="text-sm text-slate-500 hover:text-slate-700"
                 >
                   Clear filters

@@ -149,8 +149,19 @@ export default function CustomerDetailPage() {
             </>
           )}
         </div>
-        <div className="mt-6">
-          <Link href={`/bills?search=${encodeURIComponent(customer.name)}`} className="btn-secondary">View bills for this customer</Link>
+        <div className="mt-6 space-y-2">
+          <p className="text-sm font-medium text-slate-600">Bills</p>
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/bills?customer=${id}&show=outstanding`} className="btn-primary">
+              Outstanding bills
+            </Link>
+            <Link href={`/bills?customer=${id}&show=paid`} className="btn-secondary">
+              Paid bills
+            </Link>
+            <Link href={`/bills?customer=${id}&show=written_off`} className="btn-secondary text-rose-700">
+              Written off
+            </Link>
+          </div>
         </div>
       </div>
     </main>

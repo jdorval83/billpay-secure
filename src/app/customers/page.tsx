@@ -98,21 +98,34 @@ export default function CustomersPage() {
                   <th className="text-left p-4 text-sm font-semibold text-slate-700">Name</th>
                   <th className="text-left p-4 text-sm font-semibold text-slate-700">Email</th>
                   <th className="text-left p-4 text-sm font-semibold text-slate-700">Phone</th>
+                  <th className="text-left p-4 text-sm font-semibold text-slate-700">Bills</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredCustomers.length === 0 ? (
-                  <tr><td colSpan={3} className="p-6 text-center text-slate-500">No customers match your search.</td></tr>
+                  <tr><td colSpan={4} className="p-6 text-center text-slate-500">No customers match your search.</td></tr>
                 ) : (
                 paginatedCustomers.map((c) => (
                   <tr
                     key={c.id}
-                    className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors cursor-pointer"
-                    onClick={() => router.push(`/customers/${c.id}`)}
+                    className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors"
                   >
-                    <td className="p-4 font-medium text-slate-900">{c.name}</td>
+                    <td className="p-4 font-medium text-slate-900">
+                      <button type="button" onClick={() => router.push(`/customers/${c.id}`)} className="text-left w-full hover:underline">
+                        {c.name}
+                      </button>
+                    </td>
                     <td className="p-4 text-slate-600">{c.email || "—"}</td>
                     <td className="p-4 text-slate-600">{c.phone || "—"}</td>
+                    <td className="p-4">
+                      <Link
+                        href={`/bills?customer=${c.id}&show=outstanding`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-sm text-emerald-600 hover:text-emerald-800 font-medium"
+                      >
+                        Bills →
+                      </Link>
+                    </td>
                   </tr>
                 ))
                 )}

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 
 type Customer = { id: string };
 type Bill = {
@@ -16,6 +16,8 @@ type Bill = {
   created_at?: string;
   customers?: { name?: string | null } | null;
 };
+
+type WeekData = { week: string; label: string; charges: number; payments: number };
 
 const AGING_WEEKS = [
   { label: "Current", minDays: -Infinity, maxDays: 0 },
@@ -33,6 +35,8 @@ export default function DashboardPage() {
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
   const [recordPaymentSubmitting, setRecordPaymentSubmitting] = useState(false);
+  const [weeklyData, setWeeklyData] = useState<WeekData[]>([]);
+  const [selectedAgingBills, setSelectedAgingBills] = useState<{ label: string; bills: Bill[] } | null>(null);
   const [recordPaymentForm, setRecordPaymentForm] = useState({
     amount: "",
     check_number: "",
@@ -45,12 +49,19 @@ export default function DashboardPage() {
   const recordPaymentRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
+    const now = new Date();
+    const to = now.toISOString().slice(0, 10);
+    const from = new Date(now);
+    from.setDate(from.getDate() - 28);
+    const fromStr = from.toISOString().slice(0, 10);
     Promise.all([
       fetch("/api/customers", { credentials: "include" }).then((r) => r.json()),
       fetch("/api/bills", { credentials: "include" }).then((r) => r.json()).catch(() => ({ bills: [] })),
-    ]).then(([cRes, bRes]) => {
+      fetch(`/api/dashboard/stats?from=${fromStr}&to=${to}`, { credentials: "include" }).then((r) => r.json()).catch(() => ({ byWeek: [] })),
+    ]).then(([cRes, bRes, statsRes]) => {
       setCustomers(cRes.customers || []);
       setBills(bRes.bills || []);
+      setWeeklyData(statsRes?.byWeek || []);
       setLoading(false);
     });
   }, []);
@@ -64,14 +75,13 @@ export default function DashboardPage() {
     const total = unpaidBills.reduce((sum, b) => sum + (b.balance_cents ?? 0), 0);
     const today = new Date();
     const aging = AGING_WEEKS.map(({ label, minDays, maxDays }) => {
-      const amount = unpaidBills
-        .filter((b) => {
-          const due = new Date(b.due_date + "T00:00:00");
-          const daysOverdue = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
-          return daysOverdue >= minDays && daysOverdue <= maxDays;
-        })
-        .reduce((s, b) => s + (b.balance_cents ?? 0), 0);
-      return { label, amountCents: amount, amount: amount / 100 };
+      const bucketBills = unpaidBills.filter((b) => {
+        const due = new Date(b.due_date + "T00:00:00");
+        const daysOverdue = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+        return daysOverdue >= minDays && daysOverdue <= maxDays;
+      });
+      const amount = bucketBills.reduce((s, b) => s + (b.balance_cents ?? 0), 0);
+      return { label, amountCents: amount, amount: amount / 100, bills: bucketBills };
     });
     return {
       unpaid: unpaidBills,
@@ -176,27 +186,72 @@ export default function DashboardPage() {
           </Link>
         </div>
 
+        {weeklyData.length > 0 && (
+          <div className="card p-6 mb-8">
+            <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Weekly charges vs payments</h2>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={weeklyData.map((w) => ({ ...w, chargesD: w.charges / 100, paymentsD: w.payments / 100 }))} margin={{ top: 12, right: 12, left: 12, bottom: 12 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <XAxis dataKey="week" tick={{ fontSize: 10 }} tickFormatter={(v) => v?.slice(5) || v} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + (v >= 1000 ? (v / 1000) + "k" : v)} allowDecimals={false} />
+                <Tooltip formatter={(v: number, name: string) => ["$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2 }), name === "chargesD" ? "Charges" : "Payments"]} labelFormatter={(_, payload) => payload?.[0]?.payload?.label || ""} />
+                <Line type="monotone" dataKey="chargesD" name="Charges" stroke="#475569" strokeWidth={2} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="paymentsD" name="Payments" stroke="#059669" strokeWidth={2} dot={{ r: 4 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
         <div className="card p-6 mb-8">
           <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Aging by week (outstanding)</h2>
-          <p className="text-xs text-slate-500 mb-4">Current = not yet overdue. Week 1 = 1–7 days overdue, Week 2 = 8–14 days, etc.</p>
+          <p className="text-xs text-slate-500 mb-4">Click a bar for details. Current = not yet overdue. Week 1 = 1–7 days overdue, etc.</p>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={agingByWeek} margin={{ top: 12, right: 12, left: 12, bottom: 12 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + (v >= 1000 ? (v / 1000) + "k" : v)} allowDecimals={false} />
               <Tooltip formatter={(v: number) => ["$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2 }), "Outstanding"]} />
-              <Bar dataKey="amount" fill="#b45309" radius={[4, 4, 0, 0]} name="Outstanding" />
+              <Bar dataKey="amount" fill="#b45309" radius={[4, 4, 0, 0]} name="Outstanding" onClick={(data: { label: string; bills: Bill[] }) => data?.bills && setSelectedAgingBills({ label: data.label, bills: data.bills })} cursor="pointer">
+                {agingByWeek.map((entry, i) => (
+                  <Cell key={i} fill={entry.amountCents > 0 ? "#b45309" : "#e2e8f0"} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-6">
             {agingByWeek.map((a) => (
-              <div key={a.label} className="rounded-lg bg-slate-50 p-3 text-center">
+              <button
+                key={a.label}
+                type="button"
+                onClick={() => setSelectedAgingBills({ label: a.label, bills: a.bills })}
+                className="rounded-lg bg-slate-50 p-3 text-center hover:bg-slate-100 transition-colors"
+              >
                 <p className="text-xs font-medium text-slate-600">{a.label}</p>
                 <p className="text-base font-bold text-slate-900">{formatMoney(a.amountCents)}</p>
-              </div>
+              </button>
             ))}
           </div>
-          <Link href="/bills" className="inline-block mt-4 text-sm font-medium text-amber-700 hover:text-amber-800">View outstanding bills →</Link>
+          {selectedAgingBills && (
+            <div className="mt-6 p-4 border border-slate-200 rounded-lg bg-slate-50">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-sm font-semibold text-slate-700">{selectedAgingBills.label} — {selectedAgingBills.bills.length} bill(s)</h3>
+                <button type="button" onClick={() => setSelectedAgingBills(null)} className="text-sm text-slate-500 hover:text-slate-700">Close</button>
+              </div>
+              {selectedAgingBills.bills.length === 0 ? (
+                <p className="text-sm text-slate-500">No bills in this bucket</p>
+              ) : (
+                <ul className="space-y-2 max-h-48 overflow-y-auto">
+                  {selectedAgingBills.bills.map((b) => (
+                    <li key={b.id} className="flex items-center justify-between text-sm">
+                      <Link href={`/bills/${b.id}`} className="text-amber-800 hover:underline font-medium">{(b.customers as { name?: string })?.name ?? "—"}</Link>
+                      <span>{formatMoney(b.balance_cents)} — due {b.due_date}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          <Link href="/bills" className="inline-block mt-4 text-sm font-medium text-amber-700 hover:text-amber-800">View all outstanding bills →</Link>
         </div>
 
         <div className="mb-8">
