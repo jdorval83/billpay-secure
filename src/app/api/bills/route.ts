@@ -33,7 +33,7 @@ export async function POST(request: Request) {
         balance_cents: amount,
         description: (description && String(description).trim()) || "Invoice",
         due_date: due_date || new Date().toISOString().split("T")[0],
-        status: "draft",
+        status: "ready",
         recurring_schedule: ["weekly", "biweekly", "monthly"].includes(recurring_schedule) ? recurring_schedule : null,
       })
       .select("*, customers(name, email, phone)")
@@ -46,10 +46,10 @@ export async function POST(request: Request) {
 }
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  draft: ["finalized", "void"],
-  finalized: ["draft", "sent", "void"],
-  sent: ["paid", "written_off", "void"],
-  billed: ["sent", "paid", "written_off", "void"],
+  ready: ["billed", "void"],
+  draft: ["ready", "billed", "void"],
+  billed: ["paid", "written_off", "void"],
+  sent: ["billed", "paid", "written_off", "void"],
   paid: [],
   written_off: [],
   void: [],
@@ -61,9 +61,9 @@ export async function PATCH(request: Request) {
     const body = await request.json().catch(() => ({}));
     const ids: string[] = Array.isArray(body?.ids) ? body.ids : [];
     const newStatus = body?.status && String(body.status).toLowerCase();
-    if (!ids.length || !newStatus || !["finalized", "sent", "paid", "written_off"].includes(newStatus)) {
+    if (!ids.length || !newStatus || !["ready", "billed", "sent", "paid", "written_off"].includes(newStatus)) {
       return NextResponse.json(
-        { error: "ids array and status (finalized, sent, paid, written_off) required" },
+        { error: "ids array and status (ready, billed, paid, written_off) required" },
         { status: 400 }
       );
     }
@@ -104,10 +104,10 @@ export async function PATCH(request: Request) {
       const allowed = ALLOWED_TRANSITIONS[current];
       if (!allowed?.includes(newStatus)) continue;
       const u = { ...update } as Record<string, unknown>;
-      if (newStatus === "sent") {
-        u.sent_at = nowIso;
-        u.last_sent_at = nowIso;
-        u.first_sent_at = bill.first_sent_at || nowIso;
+      if (newStatus === "sent" || newStatus === "billed") {
+        (u as Record<string, unknown>).sent_at = nowIso;
+        (u as Record<string, unknown>).last_sent_at = nowIso;
+        (u as Record<string, unknown>).first_sent_at = bill.first_sent_at || nowIso;
       }
       const bid = (bill as { business_id?: string }).business_id ?? businessId;
       await supabaseAdmin.from("bills").update(u).eq("id", bill.id).eq("business_id", bid);

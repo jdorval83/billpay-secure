@@ -114,6 +114,13 @@ export async function POST(request: Request) {
       const linkRows = billIds.map((billId: string) => ({ invoice_id: invoice.id, bill_id: billId }));
       const { error: linkError } = await supabaseAdmin.from("invoice_bills").insert(linkRows);
       if (linkError) return NextResponse.json({ error: linkError.message, invoice }, { status: 500 });
+      const nowIso = new Date().toISOString();
+      await supabaseAdmin.from("bills").update({
+        status: "billed",
+        sent_at: nowIso,
+        first_sent_at: nowIso,
+        last_sent_at: nowIso,
+      }).in("id", billIds).eq("business_id", businessId);
     }
 
     const lineItemRows = baseLineItems.map((item: { description: string; quantity?: number; unitPriceCents?: number; amountCents: number; sortOrder?: number; sourceType?: string; sourceId?: string }, index: number) => ({

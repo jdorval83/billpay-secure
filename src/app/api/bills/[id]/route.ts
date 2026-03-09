@@ -25,10 +25,10 @@ export async function GET(
 }
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  draft: ["finalized", "void"],
-  finalized: ["draft", "sent", "void"],
-  sent: ["paid", "written_off", "void"],
-  billed: ["sent", "paid", "written_off", "void"],
+  ready: ["billed", "void"],
+  draft: ["ready", "billed", "void"],
+  billed: ["paid", "written_off", "void"],
+  sent: ["billed", "paid", "written_off", "void"],
   paid: [],
   written_off: [],
   void: [],
@@ -52,10 +52,10 @@ export async function PATCH(
   const newStatus = body.status && String(body.status).toLowerCase();
   if (
     !newStatus ||
-    !["finalized", "draft", "void", "sent", "paid", "written_off"].includes(newStatus)
+    !["ready", "draft", "billed", "sent", "void", "paid", "written_off"].includes(newStatus)
   ) {
     return NextResponse.json(
-      { error: "status must be one of: finalized, draft, void, sent, paid, written_off" },
+      { error: "status must be one of: ready, billed, paid, written_off, void" },
       { status: 400 }
     );
   }
@@ -97,7 +97,7 @@ export async function PATCH(
   const update: Record<string, unknown> = { status: newStatus };
   const nowIso = new Date().toISOString();
 
-  if (newStatus === "sent") {
+  if (newStatus === "sent" || newStatus === "billed") {
     update.sent_at = nowIso;
     update.first_sent_at = bill.first_sent_at || nowIso;
     update.last_sent_at = nowIso;

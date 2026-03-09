@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     .from("bills")
     .select("id, amount_cents, balance_cents, due_date, description, customers(name, phone, sms_consent_at)")
     .eq("business_id", businessId)
-    .in("status", ["finalized", "billed", "sent"]);
+    .in("status", ["billed", "sent"]);
 
   const billList = (bills || []) as { id: string; balance_cents?: number; due_date: string; description?: string; customers?: { name?: string; phone?: string; sms_consent_at?: string | null } | { name?: string; phone?: string; sms_consent_at?: string | null }[] }[];
   const outstanding = billList

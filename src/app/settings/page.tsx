@@ -8,6 +8,7 @@ type Business = {
   logo_url: string | null;
   support_email: string | null;
   invoice_footer: string | null;
+  past_due_days?: number;
 };
 
 export default function SettingsPage() {
@@ -16,6 +17,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [footer, setFooter] = useState("");
+  const [pastDueDays, setPastDueDays] = useState<number>(0);
 
   useEffect(() => {
     setLoading(true);
@@ -25,6 +27,7 @@ export default function SettingsPage() {
         if (data.business) {
           setBusiness(data.business);
           setFooter(data.business.invoice_footer || "");
+          setPastDueDays(typeof data.business.past_due_days === "number" ? data.business.past_due_days : 0);
         }
       })
       .finally(() => setLoading(false));
@@ -55,7 +58,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveFooter = async () => {
+  const handleSave = async () => {
     if (!business) return;
     setSaving(true);
     setMessage(null);
@@ -63,7 +66,7 @@ export default function SettingsPage() {
       const res = await fetch("/api/business", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ invoice_footer: footer }),
+        body: JSON.stringify({ invoice_footer: footer, past_due_days: pastDueDays }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to save settings");
@@ -143,6 +146,26 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+        <div className="card p-6 space-y-4">
+          <h2 className="text-sm font-semibold text-slate-800">Billing</h2>
+          <div>
+            <label className="label">Days until past due</label>
+            <input
+              type="number"
+              min={0}
+              max={365}
+              value={pastDueDays}
+              onChange={(e) => setPastDueDays(Math.max(0, Math.min(365, parseInt(e.target.value, 10) || 0)))}
+              className="input w-24"
+            />
+            <p className="mt-1 text-xs text-slate-500">Number of days after the due date before a bill is considered past due. 0 = due date is the cutoff.</p>
+          </div>
+          <div className="flex justify-end">
+            <button type="button" onClick={handleSave} disabled={saving} className="btn-primary">
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
         <div className="card p-6 space-y-3">
           <h2 className="text-sm font-semibold text-slate-800">Invoice footer</h2>
           <textarea
@@ -154,7 +177,7 @@ export default function SettingsPage() {
           <div className="flex justify-end">
             <button
               type="button"
-              onClick={handleSaveFooter}
+              onClick={handleSave}
               disabled={saving}
               className="btn-primary"
             >

@@ -20,9 +20,9 @@ type Bill = {
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
-  finalized: "Finished",
+  ready: "Ready",
   billed: "Billed",
-  sent: "Sent",
+  sent: "Billed",
   paid: "Paid",
   written_off: "Written off",
   void: "Void",
@@ -30,12 +30,11 @@ const STATUS_LABELS: Record<string, string> = {
 function StatusBadge({ bill }: { bill: Bill }) {
   const s = (bill.status || "draft").toLowerCase();
   const today = new Date().toISOString().slice(0, 10);
-  const isOverdue = (s === "sent" || s === "billed" || s === "finalized") && bill.balance_cents > 0 && bill.due_date < today;
+  const isOverdue = (s === "sent" || s === "billed") && bill.balance_cents > 0 && bill.due_date < today;
   const displayStatus = isOverdue ? "overdue" : s;
   const styles: Record<string, string> = {
     draft: "bg-amber-50 text-amber-700 border-amber-200",
-    finalized: "bg-sky-50 text-sky-700 border-sky-200",
-    finished: "bg-sky-50 text-sky-700 border-sky-200",
+    ready: "bg-sky-50 text-sky-700 border-sky-200",
     billed: "bg-slate-100 text-slate-700 border-slate-200",
     sent: "bg-indigo-50 text-indigo-700 border-indigo-200",
     paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -54,7 +53,6 @@ function BillsPageContent() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [finalizingId, setFinalizingId] = useState<string | null>(null);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [statusChangingId, setStatusChangingId] = useState<string | null>(null);
@@ -75,7 +73,7 @@ function BillsPageContent() {
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   const outstandingCount = useMemo(() =>
-    bills.filter((b) => (b.balance_cents ?? 0) > 0 && ["finalized", "billed", "sent"].includes((b.status || "").toLowerCase())).length,
+    bills.filter((b) => (b.balance_cents ?? 0) > 0 && ["billed", "sent"].includes((b.status || "").toLowerCase())).length,
   [bills]);
 
   const filteredBills = useMemo(() => {
@@ -103,7 +101,7 @@ function BillsPageContent() {
       if (statusFilter === "overdue") {
         out = out.filter((b) => {
           const s = (b.status || "").toLowerCase();
-          return (s === "sent" || s === "billed" || s === "finalized") && b.balance_cents > 0 && b.due_date < today;
+          return (s === "sent" || s === "billed") && b.balance_cents > 0 && b.due_date < today;
         });
       } else {
         out = out.filter((b) => (b.status || "").toLowerCase() === statusFilter);
@@ -150,10 +148,9 @@ function BillsPageContent() {
   }, []);
 
   const format = (c: number) => "$" + (c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
-  const canFinalize = (b: Bill) => (b.status || "draft").toLowerCase() === "draft";
   const canSelectForInvoice = (b: Bill) => {
     const s = (b.status || "").toLowerCase();
-    return (s === "draft" || s === "finalized") && b.balance_cents > 0;
+    return (s === "draft" || s === "ready") && b.balance_cents > 0;
   };
 
   const toggleSelect = (id: string) => {
@@ -165,7 +162,7 @@ function BillsPageContent() {
     });
   };
 
-  const selectableOnPage = paginatedBills.filter((b) => canSelectForInvoice(b) || canFinalize(b) || (b.status || "").toLowerCase() === "finalized" || ["sent", "billed"].includes((b.status || "").toLowerCase()));
+  const selectableOnPage = paginatedBills.filter((b) => canSelectForInvoice(b) || ["sent", "billed"].includes((b.status || "").toLowerCase()));
   const allSelectedOnPage = selectableOnPage.length > 0 && selectableOnPage.every((b) => selectedIds.has(b.id));
   const toggleSelectAll = () => {
     if (allSelectedOnPage) {
@@ -188,28 +185,6 @@ function BillsPageContent() {
   const canCreateInvoice = selectedBills.length > 0 && sameCustomer;
   const canDelete = selectedBills.length > 0;
 
-  const handleFinalize = async (bill: Bill) => {
-    if (!canFinalize(bill)) return;
-    setFinalizingId(bill.id);
-    setMessage(null);
-    try {
-      const res = await fetch(`/api/bills/${bill.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "finalized" }),
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to finalize");
-      setMessage({ type: "success", text: "Bill finalized. Ready to be added to an invoice." });
-      fetchBills();
-    } catch (e) {
-      setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to finalize bill" });
-    } finally {
-      setFinalizingId(null);
-    }
-  };
-
   const updateStatus = async (bill: Bill, status: string, extraBody?: Record<string, unknown>) => {
     setStatusChangingId(bill.id);
     setMessage(null);
@@ -223,7 +198,7 @@ function BillsPageContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update bill");
       let text = "";
-      if (status === "sent") text = "Bill marked as sent.";
+      if (status === "billed") text = "Bill marked as sent.";
       else if (status === "paid") text = "Bill marked as paid.";
       else if (status === "written_off") text = "Bill written off.";
       else text = "Bill updated.";
@@ -237,7 +212,7 @@ function BillsPageContent() {
   };
 
   const handleMarkSent = async (bill: Bill) => {
-    await updateStatus(bill, "sent");
+    await updateStatus(bill, "billed");
   };
 
   const handleMarkPaid = async (bill: Bill) => {
@@ -253,7 +228,7 @@ function BillsPageContent() {
     const ids = selectedBills.map((b) => b.id);
     const eligible = selectedBills.filter((b) => {
       const s = (b.status || "").toLowerCase();
-      const allowed = status === "finalized" ? ["draft"] : status === "sent" ? ["finalized"] : ["sent", "billed"];
+      const allowed = status === "billed" ? ["draft", "ready"] : ["sent", "billed"];
       return allowed.includes(s);
     });
     if (eligible.length === 0) {
@@ -487,9 +462,8 @@ function BillsPageContent() {
               <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="input w-32">
                 <option value="">All statuses</option>
                 <option value="draft">Draft</option>
-                <option value="finalized">Finished</option>
+                <option value="ready">Ready</option>
                 <option value="billed">Billed</option>
-                <option value="sent">Sent</option>
                 <option value="paid">Paid</option>
                 <option value="overdue">Overdue</option>
                 <option value="written_off">Written off</option>
@@ -525,13 +499,8 @@ function BillsPageContent() {
             {selectedBills.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
                 <span className="text-sm font-medium text-slate-700">{selectedBills.length} selected</span>
-                {selectedBills.every((b) => (b.status || "").toLowerCase() === "draft") && (
-                  <button type="button" onClick={() => handleBulkStatus("finalized")} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5">
-                    {bulkActionLoading ? "Updating…" : "Finalize all"}
-                  </button>
-                )}
-                {selectedBills.every((b) => (b.status || "").toLowerCase() === "finalized") && (
-                  <button type="button" onClick={() => handleBulkStatus("sent")} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5">
+                {selectedBills.some((b) => ["ready", "draft"].includes((b.status || "").toLowerCase())) && (
+                  <button type="button" onClick={() => handleBulkStatus("billed")} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5">
                     {bulkActionLoading ? "Updating…" : "Mark sent all"}
                   </button>
                 )}
@@ -588,7 +557,7 @@ function BillsPageContent() {
                     }}
                   >
                     <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
-                      {(canSelectForInvoice(b) || canFinalize(b) || (b.status || "").toLowerCase() === "finalized" || ["sent", "billed"].includes((b.status || "").toLowerCase())) ? (
+                      {(canSelectForInvoice(b) || ["sent", "billed"].includes((b.status || "").toLowerCase())) ? (
                         <input type="checkbox" checked={selectedIds.has(b.id)} onChange={() => toggleSelect(b.id)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                       ) : (
                         <span className="text-slate-300">—</span>
@@ -602,20 +571,8 @@ function BillsPageContent() {
                     <td className="p-3 text-right">
                       {(() => {
                         const s = (b.status || "draft").toLowerCase();
-                        const isBusy = finalizingId === b.id || statusChangingId === b.id;
-                        if (s === "draft") {
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => handleFinalize(b)}
-                              disabled={finalizingId === b.id}
-                              className="text-sm font-medium text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
-                            >
-                              {finalizingId === b.id ? "Finalizing…" : "Finalize"}
-                            </button>
-                          );
-                        }
-                        if (s === "finalized") {
+                        const isBusy = statusChangingId === b.id;
+                        if (s === "draft" || s === "ready") {
                           return (
                             <button
                               type="button"
@@ -630,16 +587,6 @@ function BillsPageContent() {
                         if (s === "sent" || s === "billed") {
                           return (
                             <div className="flex justify-end gap-3" onClick={(e) => e.stopPropagation()}>
-                              {s === "billed" && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleMarkSent(b)}
-                                  disabled={isBusy}
-                                  className="text-sm font-medium text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
-                                >
-                                  {statusChangingId === b.id ? "Updating…" : "Mark sent"}
-                                </button>
-                              )}
                               <button
                                 type="button"
                                 onClick={() => handleMarkPaid(b)}
@@ -696,7 +643,7 @@ function BillsPageContent() {
           </>
         )}
         <p className="mt-4 text-xs text-slate-500">
-          Draft bills must be <strong>Finalized</strong> before sending. Select bills (same customer) and use <strong>Create invoice</strong> to send.
+          Select Ready bills (same customer) and use <strong>Create invoice</strong> to send, or <strong>Mark sent</strong> to mark individually.
         </p>
       </div>
     </main>

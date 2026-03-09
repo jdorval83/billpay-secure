@@ -81,7 +81,7 @@ export default function Home() {
           </span>
         </span>
         </div>
-        <a href="/signup" target="_self" rel="noreferrer" className="rounded-lg px-4 py-2 text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors inline-block">
+        <a href="https://billpaysecure.com/signup" className="rounded-lg px-4 py-2 text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors inline-block">
           Sign up
         </a>
       </div>
@@ -153,7 +153,7 @@ export default function Home() {
               </button>
               <p className="text-center text-sm text-slate-600 mt-4">
                 Don&apos;t have an account?{" "}
-                <a href="/signup" target="_self" rel="noreferrer" className="text-emerald-600 font-medium hover:underline">
+                <a href="https://billpaysecure.com/signup" className="text-emerald-600 font-medium hover:underline">
                   Sign up
                 </a>
               </p>

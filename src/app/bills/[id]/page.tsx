@@ -23,13 +23,23 @@ type Bill = {
   customers?: { name?: string; email?: string; phone?: string } | null;
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
+  ready: "Ready",
+  billed: "Billed",
+  sent: "Billed",
+  paid: "Paid",
+  written_off: "Written off",
+  void: "Void",
+};
+
 function StatusBadge({ status }: { status: string }) {
   const s = (status || "draft").toLowerCase();
   const styles: Record<string, string> = {
     draft: "bg-amber-50 text-amber-700 border-amber-200",
-    finalized: "bg-sky-50 text-sky-700 border-sky-200",
+    ready: "bg-sky-50 text-sky-700 border-sky-200",
     billed: "bg-slate-100 text-slate-700 border-slate-200",
-    sent: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    sent: "bg-slate-100 text-slate-700 border-slate-200",
     paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
     written_off: "bg-rose-50 text-rose-700 border-rose-200",
     void: "bg-slate-100 text-slate-500 border-slate-200",
@@ -39,7 +49,7 @@ function StatusBadge({ status }: { status: string }) {
     <span
       className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${style}`}
     >
-      {s}
+      {STATUS_LABELS[s] || s}
     </span>
   );
 }
@@ -95,8 +105,7 @@ export default function BillDetailPage() {
     }
   };
 
-  const canFinalize = bill && (bill.status || "draft").toLowerCase() === "draft";
-  const canMarkSent = bill && (bill.status || "").toLowerCase() === "finalized";
+  const canMarkSent = bill && ["draft", "ready"].includes((bill.status || "").toLowerCase());
   const canMarkPaid = bill && ["sent", "billed"].includes((bill.status || "").toLowerCase());
   const canWriteOff = bill && ["sent", "billed"].includes((bill.status || "").toLowerCase());
 
@@ -280,20 +289,10 @@ export default function BillDetailPage() {
                 Actions
               </h2>
               <div className="flex flex-col gap-2">
-                {canFinalize && (
-                  <button
-                    type="button"
-                    onClick={() => updateStatus("finalized")}
-                    disabled={busy}
-                    className="btn-primary w-full"
-                  >
-                    {busy ? "Updating…" : "Finalize"}
-                  </button>
-                )}
                 {canMarkSent && (
                   <button
                     type="button"
-                    onClick={() => updateStatus("sent")}
+                    onClick={() => updateStatus("billed")}
                     disabled={busy}
                     className="btn-primary w-full"
                   >
@@ -323,7 +322,7 @@ export default function BillDetailPage() {
                     {busy ? "Updating…" : "Write off"}
                   </button>
                 )}
-                {!canFinalize && !canMarkSent && !canMarkPaid && !canWriteOff && (
+                {!canMarkSent && !canMarkPaid && !canWriteOff && (
                   <p className="text-sm text-slate-500">No actions available for this status.</p>
                 )}
               </div>

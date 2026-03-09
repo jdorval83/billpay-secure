@@ -42,7 +42,6 @@ export default function DashboardPage() {
     return s.toISOString().slice(0, 10);
   });
   const [chartTo, setChartTo] = useState(() => new Date().toISOString().slice(0, 10));
-  const [weeklyData, setWeeklyData] = useState<WeekData[]>([]);
   const [selectedAgingBills, setSelectedAgingBills] = useState<{ label: string; bills: Bill[] } | null>(null);
   const [recordPaymentForm, setRecordPaymentForm] = useState({
     amount: "",
@@ -66,49 +65,39 @@ export default function DashboardPage() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!chartFrom || !chartTo) return;
-    fetch(`/api/dashboard/stats?from=${chartFrom}&to=${chartTo}`, { credentials: "include" })
-      .then((r) => r.json())
-      .catch(() => null)
-      .then((statsRes) => {
-        const apiWeeks = statsRes?.byWeek || [];
-        if (apiWeeks.length > 0) {
-          setWeeklyData(apiWeeks);
-        } else if (bills.length > 0) {
-          const start = new Date(chartFrom + "T00:00:00").getTime();
-          const end = new Date(chartTo + "T23:59:59").getTime();
-          const weekBuckets: Record<string, { charges: number; payments: number }> = {};
-          for (let t = start; t <= end; t += 7 * 24 * 60 * 60 * 1000) {
-            const d = new Date(t);
-            const key = d.toISOString().slice(0, 10);
-            weekBuckets[key] = { charges: 0, payments: 0 };
-          }
-          bills.forEach((b) => {
-            const created = b.created_at ? new Date(b.created_at).getTime() : 0;
-            if (created >= start && created <= end) {
-              const weekStart = new Date(Math.floor(created / (7 * 24 * 60 * 60 * 1000)) * (7 * 24 * 60 * 60 * 1000));
-              const key = weekStart.toISOString().slice(0, 10);
-              if (weekBuckets[key]) weekBuckets[key].charges += b.amount_cents || 0;
-            }
-            if ((b.status || "").toLowerCase() === "paid" && b.paid_at) {
-              const paid = new Date(b.paid_at).getTime();
-              if (paid >= start && paid <= end) {
-                const weekStart = new Date(Math.floor(paid / (7 * 24 * 60 * 60 * 1000)) * (7 * 24 * 60 * 60 * 1000));
-                const key = weekStart.toISOString().slice(0, 10);
-                if (weekBuckets[key]) weekBuckets[key].payments += b.amount_cents || 0;
-              }
-            }
-          });
-          const weeks = Object.entries(weekBuckets)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([week, { charges, payments }]) => {
-              const wEnd = new Date(week);
-              wEnd.setDate(wEnd.getDate() + 6);
-              return { week, label: `${week} – ${wEnd.toISOString().slice(0, 10)}`, charges, payments };
-            });
-          setWeeklyData(weeks);
+  const weeklyDataComputed = useMemo(() => {
+    if (!chartFrom || !chartTo || bills.length === 0) return [];
+    const start = new Date(chartFrom + "T00:00:00").getTime();
+    const end = new Date(chartTo + "T23:59:59").getTime();
+    const weekBuckets: Record<string, { charges: number; payments: number }> = {};
+    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+    for (let t = start; t <= end; t += msPerWeek) {
+      const d = new Date(t);
+      const key = d.toISOString().slice(0, 10);
+      weekBuckets[key] = { charges: 0, payments: 0 };
+    }
+    bills.forEach((b) => {
+      const created = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (created >= start && created <= end) {
+        const weekStart = new Date(Math.floor(created / msPerWeek) * msPerWeek);
+        const key = weekStart.toISOString().slice(0, 10);
+        if (weekBuckets[key]) weekBuckets[key].charges += b.amount_cents || 0;
+      }
+      if ((b.status || "").toLowerCase() === "paid" && b.paid_at) {
+        const paid = new Date(b.paid_at).getTime();
+        if (paid >= start && paid <= end) {
+          const weekStart = new Date(Math.floor(paid / msPerWeek) * msPerWeek);
+          const key = weekStart.toISOString().slice(0, 10);
+          if (weekBuckets[key]) weekBuckets[key].payments += b.amount_cents || 0;
         }
+      }
+    });
+    return Object.entries(weekBuckets)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([week, { charges, payments }]) => {
+        const wEnd = new Date(week);
+        wEnd.setDate(wEnd.getDate() + 6);
+        return { week, label: `${week} – ${wEnd.toISOString().slice(0, 10)}`, charges, payments };
       });
   }, [chartFrom, chartTo, bills]);
 
@@ -258,9 +247,9 @@ export default function DashboardPage() {
               </button>
             </div>
           </div>
-          {weeklyData.length > 0 ? (
+          {weeklyDataComputed.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={weeklyData.map((w) => ({ ...w, chargesD: w.charges / 100, paymentsD: w.payments / 100 }))} margin={{ top: 12, right: 12, left: 12, bottom: 12 }}>
+              <LineChart data={weeklyDataComputed.map((w) => ({ ...w, chargesD: w.charges / 100, paymentsD: w.payments / 100 }))} margin={{ top: 12, right: 12, left: 12, bottom: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="week" tick={{ fontSize: 10 }} tickFormatter={(v) => v?.slice(5) || v} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + (v >= 1000 ? (v / 1000) + "k" : v)} allowDecimals={false} />
