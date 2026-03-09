@@ -4,6 +4,10 @@ import { getBusinessIdForRequest } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   const businessId = await getBusinessIdForRequest(request);
+  const { searchParams } = new URL(request.url);
+  const fromParam = searchParams.get("from");
+  const toParam = searchParams.get("to");
+  const weeksParam = Math.min(26, Math.max(1, parseInt(searchParams.get("weeks") || "6", 10)));
 
   const { data: bills } = await supabaseAdmin
     .from("bills")
@@ -33,9 +37,18 @@ export async function GET(request: Request) {
   const totalPaymentsAll = totalPayments + totalRecordedPayments;
 
   const now = new Date();
+  let rangeEnd = toParam ? new Date(toParam + "T23:59:59") : new Date(now);
+  let rangeStart = fromParam
+    ? new Date(fromParam + "T00:00:00")
+    : new Date(rangeEnd);
+  if (!fromParam) {
+    rangeStart.setDate(rangeStart.getDate() - (weeksParam - 1) * 7);
+    rangeStart.setHours(0, 0, 0, 0);
+  }
+
   const weeks: { week: string; label: string; charges: number; payments: number }[] = [];
-  for (let i = 5; i >= 0; i--) {
-    const weekEnd = new Date(now);
+  for (let i = weeksParam - 1; i >= 0; i--) {
+    const weekEnd = new Date(rangeEnd);
     weekEnd.setDate(weekEnd.getDate() - i * 7);
     const weekStart = new Date(weekEnd);
     weekStart.setDate(weekStart.getDate() - 6);
@@ -89,5 +102,7 @@ export async function GET(request: Request) {
     totalOutstanding,
     byWeek: weeks,
     aging,
+    rangeFrom: rangeStart.toISOString().slice(0, 10),
+    rangeTo: rangeEnd.toISOString().slice(0, 10),
   });
 }

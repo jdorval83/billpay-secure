@@ -30,6 +30,8 @@ type DashboardStats = {
   totalOutstanding: number;
   byWeek: { week: string; label: string; charges: number; payments: number }[];
   aging: { bucket: string; amountCents: number }[];
+  rangeFrom?: string;
+  rangeTo?: string;
 };
 
 export default function DashboardPage() {
@@ -50,20 +52,34 @@ export default function DashboardPage() {
     file: null as File | null,
   });
   const recordPaymentRef = useRef<HTMLFormElement>(null);
+  const [chartFrom, setChartFrom] = useState("");
+  const [chartTo, setChartTo] = useState("");
+  const [chartWeeks, setChartWeeks] = useState(6);
+  const [showBills, setShowBills] = useState(true);
+  const [showPayments, setShowPayments] = useState(true);
+  const [showAging, setShowAging] = useState(true);
+
+  const statsUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    if (chartFrom) params.set("from", chartFrom);
+    if (chartTo) params.set("to", chartTo);
+    params.set("weeks", String(chartWeeks));
+    return `/api/dashboard/stats?${params}`;
+  }, [chartFrom, chartTo, chartWeeks]);
 
   useEffect(() => {
     setLoading(true);
     Promise.all([
       fetch("/api/customers").then((r) => r.json()),
       fetch("/api/bills").then((r) => r.json()).catch(() => ({ bills: [] })),
-      fetch("/api/dashboard/stats").then((r) => r.json()).catch(() => null),
+      fetch(statsUrl).then((r) => r.json()).catch(() => null),
     ]).then(([cRes, bRes, statsRes]) => {
       setCustomers(cRes.customers || []);
       setBills(bRes.bills || []);
       setStats(statsRes && !statsRes.error ? statsRes : null);
       setLoading(false);
     });
-  }, []);
+  }, [statsUrl]);
 
   const formatMoney = (cents: number) =>
     "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
@@ -82,7 +98,7 @@ export default function DashboardPage() {
   const refreshData = () => {
     Promise.all([
       fetch("/api/bills").then((r) => r.json()).catch(() => ({ bills: [] })),
-      fetch("/api/dashboard/stats").then((r) => r.json()).catch(() => null),
+      fetch(statsUrl).then((r) => r.json()).catch(() => null),
     ]).then(([bRes, statsRes]) => {
       setBills(bRes.bills || []);
       setStats(statsRes && !statsRes.error ? statsRes : null);
@@ -201,37 +217,108 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
-        {stats && (stats.aging.some((a) => a.amountCents > 0) || stats.byWeek.some((w) => w.charges > 0 || w.payments > 0)) && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div className="card p-6">
-              <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Aging of receivables</h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={stats.aging.map((a) => ({ name: a.bucket, amount: a.amountCents / 100, full: a.amountCents }))} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + v} />
-                  <Tooltip formatter={(v: number) => ["$" + v.toFixed(2), "Outstanding"]} />
-                  <Bar dataKey="amount" fill="#10b981" name="Outstanding" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="card p-6">
-              <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Bills vs payments (last 6 weeks)</h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart
-                  data={stats.byWeek.map((w) => ({ week: w.week, label: w.label, charges: w.charges / 100, payments: w.payments / 100 }))}
-                  margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
+        {stats && (
+          <div className="space-y-6 mb-8">
+            <div className="flex flex-wrap items-center gap-4">
+              <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Charts</h3>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-600">Weeks:</span>
+                  <select
+                    value={chartWeeks}
+                    onChange={(e) => setChartWeeks(Number(e.target.value))}
+                    className="input py-1.5 text-sm w-20"
+                  >
+                    {[4, 6, 8, 12, 26].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-600">From:</span>
+                  <input
+                    type="date"
+                    value={chartFrom}
+                    onChange={(e) => setChartFrom(e.target.value)}
+                    className="input py-1.5 text-sm"
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-600">To:</span>
+                  <input
+                    type="date"
+                    value={chartTo}
+                    onChange={(e) => setChartTo(e.target.value)}
+                    className="input py-1.5 text-sm"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => { setChartFrom(""); setChartTo(""); setChartWeeks(6); }}
+                  className="text-sm text-slate-500 hover:text-slate-700"
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="week" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + v} />
-                  <Tooltip formatter={(v: number) => ["$" + v.toFixed(2), ""]} />
-                  <Legend />
-                  <Bar dataKey="charges" fill="#64748b" name="Bills" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="payments" fill="#10b981" name="Payments" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+                  Reset
+                </button>
+              </div>
             </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {showAging && (
+                <div className="card p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Aging of receivables</h3>
+                    <button type="button" onClick={() => setShowAging(false)} className="text-xs text-slate-400 hover:text-slate-600">Hide</button>
+                  </div>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={stats.aging.map((a) => ({ name: a.bucket, amount: a.amountCents / 100, full: a.amountCents }))} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + v} />
+                      <Tooltip formatter={(v: number) => ["$" + v.toFixed(2), "Outstanding"]} />
+                      <Bar dataKey="amount" fill="#10b981" name="Outstanding" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              <div className="card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Bills vs payments</h3>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                      <input type="checkbox" checked={showBills} onChange={(e) => setShowBills(e.target.checked)} className="rounded" />
+                      Bills
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                      <input type="checkbox" checked={showPayments} onChange={(e) => setShowPayments(e.target.checked)} className="rounded" />
+                      Payments
+                    </label>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart
+                    data={stats.byWeek.map((w) => ({
+                      week: w.week,
+                      label: w.label,
+                      charges: showBills ? w.charges / 100 : 0,
+                      payments: showPayments ? w.payments / 100 : 0,
+                    }))}
+                    margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="week" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + v} />
+                    <Tooltip formatter={(v: number) => ["$" + v.toFixed(2), ""]} />
+                    <Legend />
+                    {showBills && <Bar dataKey="charges" fill="#64748b" name="Bills" radius={[4, 4, 0, 0]} />}
+                    {showPayments && <Bar dataKey="payments" fill="#10b981" name="Payments" radius={[4, 4, 0, 0]} />}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            {!showAging && (
+              <button type="button" onClick={() => setShowAging(true)} className="text-sm text-emerald-600 hover:underline">
+                Show aging chart
+              </button>
+            )}
           </div>
         )}
         <div className="mb-8">

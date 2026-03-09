@@ -101,7 +101,10 @@ export default async function InvoiceDetailPage({ params }: PageParams) {
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
-            <a href={`/api/invoices/${id}/pdf`} className="btn-secondary">
+            <a
+              href={publicToken ? `/api/public/invoices/${publicToken}/pdf` : `/api/invoices/${id}/pdf`}
+              className="btn-secondary"
+            >
               Download PDF
             </a>
             {publicToken && invoice.status !== "paid" && invoice.status !== "void" ? (

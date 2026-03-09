@@ -8,7 +8,15 @@ type RouteParams = {
 };
 
 export async function GET(request: Request, { params }: RouteParams) {
-  const businessId = await getBusinessIdForRequest(request);
+  let businessId: string;
+  try {
+    businessId = await getBusinessIdForRequest(request);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to resolve tenant" },
+      { status: 500 }
+    );
+  }
   const { id } = await params;
 
   if (!id) {

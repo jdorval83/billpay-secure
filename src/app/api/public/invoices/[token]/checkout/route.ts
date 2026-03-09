@@ -23,6 +23,7 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
+  try {
   const { token } = await params;
   if (!token) {
     return NextResponse.json({ error: "Token required" }, { status: 400 });
@@ -94,5 +95,9 @@ export async function GET(
   }
 
   return NextResponse.redirect(session.url, { status: 303 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Checkout failed";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 

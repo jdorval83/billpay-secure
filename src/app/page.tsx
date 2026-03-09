@@ -49,7 +49,12 @@ export default function Home() {
         return;
       }
       router.refresh();
-      router.push("/dashboard");
+      const target = data.redirectUrl || "/dashboard";
+      if (target.startsWith("http")) {
+        window.location.href = target;
+      } else {
+        router.push(target);
+      }
     } catch {
       setError("Login failed");
     } finally {
@@ -151,9 +156,12 @@ export default function Home() {
               </button>
               <p className="text-center text-sm text-slate-600 mt-4">
                 Don&apos;t have an account?{" "}
-                <Link href="/signup" className="text-emerald-600 font-medium hover:underline">
+                <a
+                  href={process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/signup` : "/signup"}
+                  className="text-emerald-600 font-medium hover:underline"
+                >
                   Sign up
-                </Link>
+                </a>
               </p>
             </form>
           </div>
