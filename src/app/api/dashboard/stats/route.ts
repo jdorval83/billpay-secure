@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const fromParam = searchParams.get("from");
   const toParam = searchParams.get("to");
-  const weeksParam = Math.min(26, Math.max(1, parseInt(searchParams.get("weeks") || "4", 10)));
+  const rawWeeks = searchParams.get("weeks");
 
   const { data: bills } = await supabaseAdmin
     .from("bills")
@@ -43,6 +43,7 @@ export async function GET(request: Request) {
     ? new Date(fromParam + "T00:00:00")
     : new Date(rangeEnd);
   if (!fromParam) {
+    const weeksParam = Math.min(26, Math.max(1, parseInt(rawWeeks || "4", 10)));
     rangeStart.setDate(rangeStart.getDate() - (weeksParam - 1) * 7);
     rangeStart.setHours(0, 0, 0, 0);
   }
@@ -83,6 +84,9 @@ export async function GET(request: Request) {
     billCount: count,
   })).sort((a, b) => a.avgDaysToRemit - b.avgDaysToRemit);
 
+  const weeksParam = fromParam && toParam
+    ? Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) || 4
+    : Math.min(26, Math.max(1, parseInt(rawWeeks || "4", 10)));
   const weeks: { week: string; label: string; charges: number; payments: number }[] = [];
   for (let i = weeksParam - 1; i >= 0; i--) {
     const weekEnd = new Date(rangeEnd);

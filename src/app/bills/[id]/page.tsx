@@ -56,7 +56,7 @@ export default function BillDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    fetch(`/api/bills/${id}`)
+    fetch(`/api/bills/${id}`, { credentials: "include" })
       .then((r) => r.json())
       .then((d) => {
         if (d.bill) setBill(d.bill);
@@ -79,6 +79,7 @@ export default function BillDetailPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, ...extra }),
+        credentials: "include",
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update");

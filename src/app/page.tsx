@@ -82,7 +82,7 @@ export default function Home() {
         </span>
         </div>
         <Link
-          href={process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/signup` : "/signup"}
+          href="/signup"
           className="rounded-lg px-4 py-2 text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors"
         >
           Sign up
@@ -156,12 +156,12 @@ export default function Home() {
               </button>
               <p className="text-center text-sm text-slate-600 mt-4">
                 Don&apos;t have an account?{" "}
-                <a
-                  href={process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/signup` : "/signup"}
+                <Link
+                  href="/signup"
                   className="text-emerald-600 font-medium hover:underline"
                 >
                   Sign up
-                </a>
+                </Link>
               </p>
             </form>
           </div>

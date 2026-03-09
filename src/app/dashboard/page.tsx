@@ -53,9 +53,12 @@ export default function DashboardPage() {
     file: null as File | null,
   });
   const recordPaymentRef = useRef<HTMLFormElement>(null);
-  const [chartFrom, setChartFrom] = useState("");
-  const [chartTo, setChartTo] = useState("");
-  const [chartWeeks, setChartWeeks] = useState(4);
+  const [chartFrom, setChartFrom] = useState(() => {
+    const s = new Date();
+    s.setDate(s.getDate() - 28);
+    return s.toISOString().slice(0, 10);
+  });
+  const [chartTo, setChartTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [outstandingExpanded, setOutstandingExpanded] = useState(false);
   const [showBills, setShowBills] = useState(true);
   const [showPayments, setShowPayments] = useState(true);
@@ -63,11 +66,10 @@ export default function DashboardPage() {
 
   const statsUrl = useMemo(() => {
     const params = new URLSearchParams();
-    if (chartFrom) params.set("from", chartFrom);
-    if (chartTo) params.set("to", chartTo);
-    params.set("weeks", String(chartWeeks));
+    params.set("from", chartFrom);
+    params.set("to", chartTo);
     return `/api/dashboard/stats?${params}`;
-  }, [chartFrom, chartTo, chartWeeks]);
+  }, [chartFrom, chartTo]);
 
   useEffect(() => {
     setLoading(true);
@@ -296,19 +298,7 @@ export default function DashboardPage() {
               <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Charts</h3>
               <div className="flex flex-wrap items-center gap-3">
                 <label className="flex items-center gap-2 text-sm">
-                  <span className="text-slate-600">Weeks:</span>
-                  <select
-                    value={chartWeeks}
-                    onChange={(e) => setChartWeeks(Number(e.target.value))}
-                    className="input py-1.5 text-sm w-20"
-                  >
-                    {[4, 6, 8, 12, 26].map((n) => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <span className="text-slate-600">From:</span>
+                  <span className="text-slate-600">From</span>
                   <input
                     type="date"
                     value={chartFrom}
@@ -317,7 +307,7 @@ export default function DashboardPage() {
                   />
                 </label>
                 <label className="flex items-center gap-2 text-sm">
-                  <span className="text-slate-600">To:</span>
+                  <span className="text-slate-600">To</span>
                   <input
                     type="date"
                     value={chartTo}
@@ -327,10 +317,15 @@ export default function DashboardPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => { setChartFrom(""); setChartTo(""); setChartWeeks(4); }}
+                  onClick={() => {
+                    const s = new Date();
+                    s.setDate(s.getDate() - 28);
+                    setChartFrom(s.toISOString().slice(0, 10));
+                    setChartTo(new Date().toISOString().slice(0, 10));
+                  }}
                   className="text-sm text-slate-500 hover:text-slate-700"
                 >
-                  Reset
+                  Last 4 weeks
                 </button>
               </div>
             </div>
@@ -366,23 +361,40 @@ export default function DashboardPage() {
                     </label>
                   </div>
                 </div>
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={280}>
                   <BarChart
                     data={stats.byWeek.map((w) => ({
                       week: w.week,
+                      shortLabel: w.week.slice(5),
                       label: w.label,
                       charges: showBills ? w.charges / 100 : 0,
                       payments: showPayments ? w.payments / 100 : 0,
                     }))}
-                    margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
+                    margin={{ top: 12, right: 12, left: 12, bottom: 24 }}
+                    barCategoryGap="20%"
+                    barGap={6}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="week" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + v} />
-                    <Tooltip formatter={(v: number) => ["$" + v.toFixed(2), ""]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                    <XAxis
+                      dataKey="shortLabel"
+                      tick={{ fontSize: 11 }}
+                      interval={0}
+                      angle={stats.byWeek.length > 6 ? -25 : 0}
+                      textAnchor={stats.byWeek.length > 6 ? "end" : "middle"}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(v) => "$" + (v >= 1000 ? (v / 1000) + "k" : v)}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12 }}
+                      formatter={(v: number, name: string) => ["$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2 }), name === "charges" ? "Bills" : "Payments"]}
+                      labelFormatter={(_, payloads) => (Array.isArray(payloads) && payloads[0]?.payload?.label) || ""}
+                    />
                     <Legend />
-                    {showBills && <Bar dataKey="charges" fill="#64748b" name="Bills" radius={[4, 4, 0, 0]} />}
-                    {showPayments && <Bar dataKey="payments" fill="#10b981" name="Payments" radius={[4, 4, 0, 0]} />}
+                    {showBills && <Bar dataKey="charges" fill="#475569" name="Bills" radius={[4, 4, 0, 0]} maxBarSize={48} />}
+                    {showPayments && <Bar dataKey="payments" fill="#059669" name="Payments" radius={[4, 4, 0, 0]} maxBarSize={48} />}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
