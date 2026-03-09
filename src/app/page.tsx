@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -59,7 +60,8 @@ export default function Home() {
   return (
     <main className="min-h-screen flex flex-col lg:flex-row relative">
       {/* Corner branding: text only when logo shown in hero (avoid duplicate logos) */}
-      <div className="absolute top-5 left-5 sm:top-6 sm:left-6 flex items-center gap-3 z-10">
+      <div className="absolute top-5 left-5 right-5 sm:top-6 sm:left-6 sm:right-6 flex items-center justify-between z-10">
+        <div className="flex items-center gap-3">
         {!business?.logo_url ? (
           <span className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-xl bg-emerald-500 text-white text-xl sm:text-2xl font-bold shadow-lg">
             BP
@@ -73,6 +75,13 @@ export default function Home() {
             Secure
           </span>
         </span>
+        </div>
+        <Link
+          href="/signup"
+          className="rounded-lg px-4 py-2 text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors"
+        >
+          Sign up
+        </Link>
       </div>
       <div className="flex-1 bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900/80 flex flex-col justify-center px-8 sm:px-12 lg:px-16 py-16 lg:py-0 min-h-[50vh]">
         <div className="max-w-lg mt-24 sm:mt-28 lg:mt-0">
@@ -140,6 +149,12 @@ export default function Home() {
               <button type="submit" disabled={loading} className="btn-primary w-full py-3">
                 {loading ? "Signing in…" : "Sign in"}
               </button>
+              <p className="text-center text-sm text-slate-600 mt-4">
+                Don&apos;t have an account?{" "}
+                <Link href="/signup" className="text-emerald-600 font-medium hover:underline">
+                  Sign up
+                </Link>
+              </p>
             </form>
           </div>
         </div>
