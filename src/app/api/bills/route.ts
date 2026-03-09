@@ -45,7 +45,7 @@ export async function GET(request: Request) {
     .from("invoice_bills")
     .select("bill_id, invoice_id")
     .in("bill_id", billIds);
-  const invoiceIds = [...new Set((links || []).map((l: { invoice_id: string }) => l.invoice_id))];
+  const invoiceIds = Array.from(new Set((links || []).map((l: { invoice_id: string }) => l.invoice_id)));
   const { data: invoices } = invoiceIds.length > 0
     ? await supabaseAdmin
         .from("invoices")
