@@ -30,7 +30,18 @@ export async function createClient() {
 
 /** Use request cookies directly - more reliable in Route Handlers */
 export function createClientFromRequest(request: NextRequest | Request) {
-  const cookieList = "cookies" in request ? request.cookies.getAll() : [];
+  let cookieList: { name: string; value: string }[] = [];
+  if ("cookies" in request && typeof request.cookies?.getAll === "function") {
+    cookieList = request.cookies.getAll();
+  } else {
+    const raw = request.headers.get("cookie");
+    if (raw) {
+      cookieList = raw.split(";").map((c) => {
+        const [name, ...v] = c.trim().split("=");
+        return { name: name || "", value: v.join("=").trim() };
+      }).filter((c) => c.name);
+    }
+  }
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

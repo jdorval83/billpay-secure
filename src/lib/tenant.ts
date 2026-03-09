@@ -1,4 +1,4 @@
-import { createClientFromRequest } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "./supabase";
 
 const DEFAULT_BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
@@ -26,7 +26,7 @@ export async function getBusinessIdForRequest(req: Request): Promise<string> {
 
   // Use logged-in user's business when available (fixes no-subdomain / single-tenant)
   try {
-    const supabase = createClientFromRequest(req);
+    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
