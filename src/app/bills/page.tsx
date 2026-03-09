@@ -4,8 +4,6 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-const PAGE_SIZE = 20;
-
 type Bill = {
   id: string;
   customer_id: string;
@@ -60,7 +58,7 @@ function BillsPageContent() {
   const [showFilter, setShowFilter] = useState<"outstanding" | "paid" | "written_off">("outstanding");
   const [recurringFilter, setRecurringFilter] = useState("");
   const [page, setPage] = useState(1);
-  const [showAll, setShowAll] = useState(false);
+  const [pageSize, setPageSize] = useState<20 | 50 | "all">(20);
   const [blastReminderLoading, setBlastReminderLoading] = useState(false);
   const [blastReminderModal, setBlastReminderModal] = useState<"confirm" | null>(null);
   const [blastReminderData, setBlastReminderData] = useState<{ count: number; recipients: { phone: string; customerName: string; amountCents: number; dueDate: string }[] } | null>(null);
@@ -105,13 +103,14 @@ function BillsPageContent() {
     return out;
   }, [bills, search, dateFrom, dateTo, statusFilter, recurringFilter, customerFilter, showFilter]);
 
+  const effectivePageSize = pageSize === "all" ? filteredBills.length : pageSize;
   const paginatedBills = useMemo(() => {
-    if (showAll) return filteredBills;
-    const start = (page - 1) * PAGE_SIZE;
-    return filteredBills.slice(start, start + PAGE_SIZE);
-  }, [filteredBills, page, showAll]);
+    if (pageSize === "all") return filteredBills;
+    const start = (page - 1) * pageSize;
+    return filteredBills.slice(start, start + pageSize);
+  }, [filteredBills, page, pageSize]);
 
-  const totalPages = Math.ceil(filteredBills.length / PAGE_SIZE);
+  const totalPages = pageSize === "all" ? 1 : Math.ceil(filteredBills.length / pageSize);
   const hasFilters = search.trim() || dateFrom || dateTo || statusFilter || recurringFilter || customerFilter || showFilter !== "outstanding";
 
   const fetchBills = () => {
@@ -256,6 +255,7 @@ function BillsPageContent() {
       if (!res.ok) throw new Error(data.error || "Failed");
       setMessage({ type: "success", text: `${data.updated ?? eligible.length} bill(s) updated.` });
       setSelectedIds(new Set());
+      if (status === "billed") setStatusFilter("");
       fetchBills();
     } catch (e) {
       setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed" });
@@ -280,6 +280,7 @@ function BillsPageContent() {
       if (!res.ok) throw new Error(data.error || "Failed to create sent bill");
       setMessage({ type: "success", text: "Sent bill created. View it on the Sent bills page." });
       setSelectedIds(new Set());
+      setStatusFilter("");
       fetchBills();
     } catch (e) {
       setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to create sent bill" });
@@ -473,13 +474,6 @@ function BillsPageContent() {
                 <option value="monthly">Recurring: Monthly</option>
                 <option value="__none">One-time only</option>
               </select>
-              <button
-                type="button"
-                onClick={() => { setShowAll(!showAll); setPage(1); }}
-                className="btn-secondary text-sm"
-              >
-                {showAll ? "Paginate" : "Show all"}
-              </button>
               {hasFilters && (
                 <button
                   type="button"
@@ -612,11 +606,30 @@ function BillsPageContent() {
               </tbody>
             </table>
             </div>
-            {!showAll && totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4">
-                <p className="text-sm text-slate-500">
-                  Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, filteredBills.length)} of {filteredBills.length}
-                </p>
+            <div className="flex flex-wrap justify-between items-center gap-4 mt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-600">Show</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setPageSize(v === "all" ? "all" : (parseInt(v, 10) as 20 | 50));
+                    setPage(1);
+                  }}
+                  className="input text-sm py-1.5 px-2 w-20"
+                >
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value="all">All</option>
+                </select>
+                <span className="text-sm text-slate-600">per page</span>
+                <span className="text-sm text-slate-500 ml-2">
+                  {pageSize === "all"
+                    ? `Showing all ${filteredBills.length}`
+                    : `Showing ${((page - 1) * pageSize) + 1}–${Math.min(page * pageSize, filteredBills.length)} of ${filteredBills.length}`}
+                </span>
+              </div>
+              {pageSize !== "all" && totalPages > 1 && (
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -635,8 +648,8 @@ function BillsPageContent() {
                     Next
                   </button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </>
         )}
         <p className="mt-4 text-xs text-slate-500">
