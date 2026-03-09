@@ -119,6 +119,31 @@ export default function BillDetailPage() {
     }
   };
 
+  const handleSendBill = async () => {
+    if (!bill) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId: bill.customer_id, billIds: [bill.id] }),
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send bill");
+      setMessage({ type: "success", text: "Bill sent. Invoice created and payment link sent via text (if customer has SMS)." });
+      refetchBill();
+    } catch (e) {
+      setMessage({
+        type: "error",
+        text: e instanceof Error ? e.message : "Failed to send bill",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const canEdit = bill && ["draft", "ready", "past_due", "overdue"].includes((bill.status || "").toLowerCase());
   const canMarkSent = bill && ["draft", "ready"].includes((bill.status || "").toLowerCase());
   const canMarkPaid = bill && ["billed", "past_due", "overdue", "finalized", "sent"].includes((bill.status || "").toLowerCase());
@@ -383,7 +408,7 @@ export default function BillDetailPage() {
                 {canMarkSent && (
                   <button
                     type="button"
-                    onClick={() => updateStatus("billed")}
+                    onClick={handleSendBill}
                     disabled={busy}
                     className="btn-primary w-full"
                   >

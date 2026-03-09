@@ -14,6 +14,7 @@ function NewBillForm() {
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [recurringSchedule, setRecurringSchedule] = useState<string>("");
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -60,6 +61,20 @@ function NewBillForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
+      const billId = data.bill?.id;
+      if (billId && attachmentFile && attachmentFile.size > 0) {
+        const formData = new FormData();
+        formData.set("file", attachmentFile);
+        const uploadRes = await fetch(`/api/bills/${billId}/attachment`, {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          throw new Error(uploadData.error || "Bill created but photo upload failed");
+        }
+      }
       router.push("/bills");
       router.refresh();
     } catch (err) {
@@ -117,6 +132,19 @@ function NewBillForm() {
               <option value="biweekly">Biweekly</option>
               <option value="monthly">Monthly</option>
             </select>
+          </div>
+          <div>
+            <label className="label">Job / item photo (optional)</label>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="input"
+              onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)}
+            />
+            <p className="text-xs text-slate-500 mt-1">Max 500KB. JPG, PNG, or WebP. Shown on the bill and PDF.</p>
+            {attachmentFile && (
+              <p className="text-sm text-slate-600 mt-1">{attachmentFile.name}</p>
+            )}
           </div>
           <div className="flex flex-wrap gap-3 pt-2">
             <button type="submit" disabled={loading} className="btn-primary">{loading ? "Creating…" : "Create bill"}</button>
