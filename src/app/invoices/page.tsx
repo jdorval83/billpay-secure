@@ -79,6 +79,23 @@ export default function InvoicesPage() {
 
   const selectedInvoices = filteredInvoices.filter((inv) => selectedIds.has(inv.id));
   const canDelete = selectedInvoices.length > 0;
+  const selectableOnPage = paginatedInvoices;
+  const allSelectedOnPage = selectableOnPage.length > 0 && selectableOnPage.every((inv) => selectedIds.has(inv.id));
+  const toggleSelectAll = () => {
+    if (allSelectedOnPage) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        selectableOnPage.forEach((inv) => next.delete(inv.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        selectableOnPage.forEach((inv) => next.add(inv.id));
+        return next;
+      });
+    }
+  };
 
   const handleDeleteSelected = async () => {
     if (!canDelete) return;
@@ -183,7 +200,18 @@ export default function InvoicesPage() {
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-left">
                   <th className="w-10 p-3 text-center">
-                    <span className="sr-only">Select</span>
+                    {selectableOnPage.length > 0 ? (
+                      <input
+                        type="checkbox"
+                        checked={allSelectedOnPage}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                        title="Select all"
+                        aria-label="Select all"
+                      />
+                    ) : (
+                      <span className="sr-only">Select</span>
+                    )}
                   </th>
                   <th className="p-3 font-semibold text-slate-700">Sent bill #</th>
                   <th className="p-3 font-semibold text-slate-700">Customer</th>

@@ -3,6 +3,21 @@ import { randomUUID } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getBusinessIdForRequest } from "@/lib/tenant";
 
+function getBaseUrl(request: Request): string {
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (envUrl) return envUrl.replace(/\/+$/, "");
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
+  const proto = request.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return digits ? `+${digits}` : "";
+}
+
 export async function GET(request: Request) {
   const businessId = await getBusinessIdForRequest(request);
   const { data, error } = await supabaseAdmin
@@ -135,6 +150,46 @@ export async function POST(request: Request) {
     }));
     const { error: lineError } = await supabaseAdmin.from("invoice_line_items").insert(lineItemRows);
     if (lineError) return NextResponse.json({ error: lineError.message, invoice }, { status: 500 });
+
+    // Send bill via SMS (if customer has phone and consent)
+    const custPhone = (customer as { phone?: string | null }).phone ?? "";
+    const custName = (customer as { name?: string }).name ?? "Customer";
+    const hasSmsConsent = !!(customer as { sms_consent_at?: string | null }).sms_consent_at;
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+
+    if (accountSid && authToken && fromNumber && custPhone.replace(/\D/g, "").length >= 10 && hasSmsConsent) {
+      try {
+        const baseUrl = getBaseUrl(request);
+        const paymentUrl = `${baseUrl}/public/invoices/${publicToken}`;
+        const totalStr = `$${(totalCents / 100).toFixed(2)}`;
+        const dueStr = dueAtValue ? new Date(dueAtValue).toLocaleDateString() : "—";
+        const bodyText = `Hi ${custName}, you have a bill for ${totalStr} (due ${dueStr}). Pay here: ${paymentUrl}`;
+
+        const twilio = (await import("twilio")).default;
+        const client = twilio(accountSid, authToken);
+        await client.messages.create({
+          body: bodyText,
+          from: fromNumber,
+          to: normalizePhone(custPhone),
+        });
+
+        const nowIso = new Date().toISOString();
+        await supabaseAdmin.from("bill_send_events").insert({
+          business_id: businessId,
+          invoice_id: invoice.id,
+          customer_id: customerId,
+          sent_at: nowIso,
+          channel: "sms",
+          recipient: custPhone,
+          status: "sent",
+        });
+        await supabaseAdmin.from("invoices").update({ status: "sent" }).eq("id", invoice.id);
+      } catch {
+        // Don't fail the request if SMS fails; bill was created successfully
+      }
+    }
 
     return NextResponse.json({ invoice }, { status: 201 });
   } catch (err) {

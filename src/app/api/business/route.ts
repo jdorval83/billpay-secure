@@ -69,7 +69,7 @@ export async function PATCH(request: Request) {
         delete updateFallback.past_due_days;
         delete updateFallback.reminder_interval_days;
         if (Object.keys(updateFallback).length === 0) {
-          return NextResponse.json({ error: "Run migrations 010 and 012 for past_due_days and reminder_interval_days." }, { status: 500 });
+          return NextResponse.json({ error: "Settings could not be saved. Please try again later." }, { status: 500 });
         }
         const { data: d2, error: e2 } = await supabaseAdmin
           .from("businesses")

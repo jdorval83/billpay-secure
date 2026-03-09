@@ -83,7 +83,7 @@ export default function SettingsPage() {
       setBusiness(json.business);
       setPastDueDays(typeof json.business?.past_due_days === "number" ? json.business.past_due_days : pastDueDays);
       setReminderIntervalDays(typeof json.business?.reminder_interval_days === "number" ? json.business.reminder_interval_days : reminderIntervalDays);
-      setMessage("Billing settings saved.");
+      setMessage("Updated successfully.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Failed to save");
     } finally {
@@ -105,7 +105,7 @@ export default function SettingsPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to save");
       setBusiness(json.business);
-      setMessage("Sent bill footer saved.");
+      setMessage("Updated successfully.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Failed to save");
     } finally {
