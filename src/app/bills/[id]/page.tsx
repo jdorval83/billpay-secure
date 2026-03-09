@@ -64,6 +64,8 @@ export default function BillDetailPage() {
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ amount: "", description: "", due_date: "" });
   const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -71,7 +73,14 @@ export default function BillDetailPage() {
     fetch(`/api/bills/${id}`, { credentials: "include" })
       .then((r) => r.json())
       .then((d) => {
-        if (d.bill) setBill(d.bill);
+        if (d.bill) {
+          setBill(d.bill);
+          setEditForm({
+            amount: ((d.bill.amount_cents || 0) / 100).toFixed(2),
+            description: d.bill.description || "",
+            due_date: d.bill.due_date || "",
+          });
+        }
       })
       .catch(() => setBill(null))
       .finally(() => setLoading(false));
@@ -107,9 +116,38 @@ export default function BillDetailPage() {
     }
   };
 
+  const canEdit = bill && ["draft", "ready"].includes((bill.status || "").toLowerCase());
   const canMarkSent = bill && ["draft", "ready", "finalized"].includes((bill.status || "").toLowerCase());
-  const canMarkPaid = bill && ["sent", "billed"].includes((bill.status || "").toLowerCase());
-  const canWriteOff = bill && ["sent", "billed"].includes((bill.status || "").toLowerCase());
+  const canMarkPaid = bill && ["finalized", "sent", "billed"].includes((bill.status || "").toLowerCase());
+  const canWriteOff = bill && ["finalized", "sent", "billed"].includes((bill.status || "").toLowerCase());
+
+  const handleSaveEdit = async () => {
+    if (!bill) return;
+    const amountCents = Math.round(parseFloat(editForm.amount || "0") * 100);
+    if (amountCents <= 0) {
+      setMessage({ type: "error", text: "Amount must be greater than 0" });
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/bills/${bill.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount_cents: amountCents, description: editForm.description.trim() || "Invoice", due_date: editForm.due_date }),
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save");
+      setBill(data.bill);
+      setEditing(false);
+      setMessage({ type: "success", text: "Bill updated." });
+    } catch (e) {
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to save" });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -190,9 +228,35 @@ export default function BillDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="card p-6">
-              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">
-                Summary
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Summary</h2>
+                {canEdit && (
+                  editing ? (
+                    <div className="flex gap-2">
+                      <button type="button" onClick={handleSaveEdit} disabled={busy} className="btn-primary text-sm py-1.5">Save</button>
+                      <button type="button" onClick={() => { setEditing(false); setEditForm({ amount: ((bill.amount_cents || 0) / 100).toFixed(2), description: bill.description || "", due_date: bill.due_date || "" }); }} className="btn-secondary text-sm py-1.5">Cancel</button>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => setEditing(true)} className="text-sm font-medium text-emerald-600 hover:text-emerald-800">Edit</button>
+                  )
+                )}
+              </div>
+              {editing && canEdit ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="label">Amount ($)</label>
+                    <input type="number" step="0.01" min="0" value={editForm.amount} onChange={(e) => setEditForm((f) => ({ ...f, amount: e.target.value }))} className="input" />
+                  </div>
+                  <div>
+                    <label className="label">Description</label>
+                    <input type="text" value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} className="input" />
+                  </div>
+                  <div>
+                    <label className="label">Due date</label>
+                    <input type="date" value={editForm.due_date} onChange={(e) => setEditForm((f) => ({ ...f, due_date: e.target.value }))} className="input" />
+                  </div>
+                </div>
+              ) : (
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <dt className="text-slate-500">Description</dt>
                 <dd className="font-medium text-slate-900">
@@ -237,6 +301,7 @@ export default function BillDetailPage() {
                   </>
                 )}
               </dl>
+              )}
             </div>
           </div>
 

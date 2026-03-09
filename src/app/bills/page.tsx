@@ -72,6 +72,7 @@ function BillsPageContent() {
   const [blastReminderData, setBlastReminderData] = useState<{ count: number; recipients: { phone: string; customerName: string; amountCents: number; dueDate: string }[] } | null>(null);
   const [blastSending, setBlastSending] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [actioningId, setActioningId] = useState<string | null>(null);
 
   const outstandingCount = useMemo(() =>
     bills.filter((b) => (b.balance_cents ?? 0) > 0 && ["finalized", "billed", "sent"].includes((b.status || "").toLowerCase())).length,
@@ -123,7 +124,7 @@ function BillsPageContent() {
   const hasFilters = search.trim() || dateFrom || dateTo || statusFilter || recurringFilter || customerFilter || showFilter !== "outstanding";
 
   const fetchBills = () => {
-    fetch("/api/bills")
+    fetch("/api/bills", { credentials: "include" })
       .then((r) => r.json())
       .then((d) => {
         setBills(d.bills || []);
@@ -186,6 +187,44 @@ function BillsPageContent() {
   const canCreateInvoice = selectedBills.length > 0 && sameCustomer;
   const canDelete = selectedBills.length > 0;
 
+  const updateOneStatus = async (bill: Bill, status: string, writeoffReason?: string | null) => {
+    setActioningId(bill.id);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/bills/${bill.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, writeoffReason }),
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setMessage({ type: "success", text: "Bill updated." });
+      fetchBills();
+    } catch (e) {
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to update" });
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleDeleteOne = async (bill: Bill) => {
+    if (!window.confirm("Delete this bill? This cannot be undone.")) return;
+    setActioningId(bill.id);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/bills", { method: "DELETE", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [bill.id] }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setMessage({ type: "success", text: "Bill deleted." });
+      fetchBills();
+    } catch (e) {
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed" });
+    } finally {
+      setActioningId(null);
+    }
+  };
+
   const handleBulkStatus = async (status: string, writeoffReason?: string | null) => {
     const ids = selectedBills.map((b) => b.id);
     const eligible = selectedBills.filter((b) => {
@@ -202,6 +241,7 @@ function BillsPageContent() {
     try {
       const res = await fetch("/api/bills", {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: eligible.map((b) => b.id), status, writeoffReason }),
       });
@@ -224,7 +264,7 @@ function BillsPageContent() {
     setCreatingInvoice(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/invoices", {
+      const res = await fetch("/api/invoices", { credentials: "include",
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customerId, billIds }),
@@ -249,8 +289,7 @@ function BillsPageContent() {
     setDeleting(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/bills", {
-        method: "DELETE",
+      const res = await fetch("/api/bills", { method: "DELETE", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: selectedBills.map((b) => b.id) }),
       });
@@ -292,7 +331,7 @@ function BillsPageContent() {
                 onClick={async () => {
                   setBlastReminderLoading(true);
                   try {
-                    const r = await fetch("/api/reminders/blast");
+                    const r = await fetch("/api/reminders/blast", { credentials: "include" });
                     const d = await r.json();
                     const recipients = (d.outstanding || []).map((x: { phone: string; customerName: string; amountCents: number; dueDate: string }) => ({
                       phone: x.phone,
@@ -345,6 +384,7 @@ function BillsPageContent() {
                     try {
                       const r = await fetch("/api/reminders/send-sms", {
                         method: "POST",
+                        credentials: "include",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ recipients: blastReminderData.recipients }),
                       });
@@ -494,11 +534,12 @@ function BillsPageContent() {
                   <th className="text-left p-3 text-sm font-semibold text-slate-700">Amount</th>
                   <th className="text-left p-3 text-sm font-semibold text-slate-700">Due</th>
                   <th className="text-left p-3 text-sm font-semibold text-slate-700">Status</th>
+                  <th className="p-3 text-right text-sm font-semibold text-slate-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredBills.length === 0 ? (
-                  <tr><td colSpan={6} className="p-6 text-center text-slate-500">No charges match your search.</td></tr>
+                  <tr><td colSpan={7} className="p-6 text-center text-slate-500">No charges match your search.</td></tr>
                 ) : (
                 paginatedBills.map((b) => (
                   <tr
@@ -510,17 +551,28 @@ function BillsPageContent() {
                     }}
                   >
                     <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
-                      {(canSelectForInvoice(b) || ["finalized", "sent", "billed"].includes((b.status || "").toLowerCase())) ? (
-                        <input type="checkbox" checked={selectedIds.has(b.id)} onChange={() => toggleSelect(b.id)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
+                      <input type="checkbox" checked={selectedIds.has(b.id)} onChange={() => toggleSelect(b.id)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                     </td>
                     <td className="p-3 font-medium text-slate-900">{(b.customers as { name?: string })?.name ?? "—"}</td>
                     <td className="p-3 text-slate-600">{b.description || "Invoice"}</td>
                     <td className="p-3 font-medium text-slate-900">{format(b.amount_cents)}</td>
                     <td className="p-3 text-slate-600">{b.due_date}</td>
                     <td className="p-3"><StatusBadge bill={b} /></td>
+                    <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex flex-wrap justify-end gap-1">
+                        <button type="button" onClick={() => router.push(`/bills/${b.id}`)} className="text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100">View</button>
+                        {["draft", "ready", "finalized"].includes((b.status || "").toLowerCase()) && (
+                          <button type="button" onClick={() => updateOneStatus(b, "billed")} disabled={actioningId === b.id} className="text-sm font-medium text-emerald-600 hover:text-emerald-800 px-2 py-1 rounded hover:bg-emerald-50 disabled:opacity-50">{actioningId === b.id ? "…" : "Send"}</button>
+                        )}
+                        {["finalized", "sent", "billed"].includes((b.status || "").toLowerCase()) && (
+                          <>
+                            <button type="button" onClick={() => updateOneStatus(b, "paid")} disabled={actioningId === b.id} className="text-sm font-medium text-emerald-600 hover:text-emerald-800 px-2 py-1 rounded hover:bg-emerald-50 disabled:opacity-50">{actioningId === b.id ? "…" : "Paid"}</button>
+                            <button type="button" onClick={() => updateOneStatus(b, "written_off", window.prompt("Reason (optional):") ?? undefined)} disabled={actioningId === b.id} className="text-sm font-medium text-rose-600 hover:text-rose-800 px-2 py-1 rounded hover:bg-rose-50 disabled:opacity-50">{actioningId === b.id ? "…" : "Write off"}</button>
+                          </>
+                        )}
+                        <button type="button" onClick={() => handleDeleteOne(b)} disabled={actioningId === b.id} className="text-sm font-medium text-slate-500 hover:text-rose-600 px-2 py-1 rounded hover:bg-rose-50 disabled:opacity-50">{actioningId === b.id ? "…" : "Delete"}</button>
+                      </div>
+                    </td>
                   </tr>
                 ))
                 )}
@@ -555,7 +607,7 @@ function BillsPageContent() {
           </>
         )}
         <p className="mt-4 text-xs text-slate-500">
-          Select charges, then use the buttons above: <strong>SEND BILL</strong>, <strong>EDIT</strong>, <strong>DELETE</strong>, <strong>Mark as Paid</strong>.
+          Use the <strong>Actions</strong> column on each row, or select multiple and use the bulk buttons above.
         </p>
       </div>
     </main>

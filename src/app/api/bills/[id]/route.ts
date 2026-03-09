@@ -43,22 +43,11 @@ export async function PATCH(
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "Bill ID required" }, { status: 400 });
 
-  let body: { status?: string; writeoffReason?: string | null };
+  let body: { status?: string; writeoffReason?: string | null; amount_cents?: number; description?: string; due_date?: string };
   try {
     body = await _request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const newStatus = body.status && String(body.status).toLowerCase();
-  if (
-    !newStatus ||
-    !["ready", "draft", "billed", "sent", "void", "paid", "written_off"].includes(newStatus)
-  ) {
-    return NextResponse.json(
-      { error: "status must be one of: ready, billed, paid, written_off, void" },
-      { status: 400 }
-    );
   }
 
   let { data: bill, error: fetchError } = await supabaseAdmin
@@ -85,34 +74,47 @@ export async function PATCH(
   }
 
   const effectiveBusinessId = (bill as { business_id: string }).business_id;
+  const update: Record<string, unknown> = {};
 
-  const current = (bill.status || "draft").toLowerCase();
-  const allowed = ALLOWED_TRANSITIONS[current];
-  if (!allowed || !allowed.includes(newStatus)) {
-    return NextResponse.json(
-      { error: `Cannot change status from ${current} to ${newStatus}` },
-      { status: 400 }
-    );
-  }
-
-  const update: Record<string, unknown> = { status: newStatus };
-  const nowIso = new Date().toISOString();
-
-  if (newStatus === "sent" || newStatus === "billed") {
-    update.sent_at = nowIso;
-    update.first_sent_at = bill.first_sent_at || nowIso;
-    update.last_sent_at = nowIso;
-  }
-  if (newStatus === "paid") {
-    update.paid_at = nowIso;
-    update.balance_cents = 0;
-  }
-  if (newStatus === "written_off") {
-    update.written_off_at = nowIso;
-    update.balance_cents = 0;
-    if (body.writeoffReason) {
-      update.writeoff_reason = String(body.writeoffReason).slice(0, 500);
+  // Field updates (amount, description, due_date) — only for draft/ready
+  const canEdit = ["draft", "ready"].includes((bill.status || "").toLowerCase());
+  if (canEdit) {
+    if (typeof body.amount_cents === "number" && body.amount_cents > 0) {
+      update.amount_cents = Math.round(body.amount_cents);
+      update.balance_cents = Math.round(body.amount_cents);
     }
+    if (typeof body.description === "string") update.description = body.description.trim() || "Invoice";
+    if (typeof body.due_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.due_date)) update.due_date = body.due_date;
+  }
+
+  // Status update
+  const newStatus = body.status && String(body.status).toLowerCase();
+  if (newStatus && ["ready", "draft", "billed", "sent", "void", "paid", "written_off"].includes(newStatus)) {
+    const current = (bill.status || "draft").toLowerCase();
+    const allowed = ALLOWED_TRANSITIONS[current];
+    if (!allowed?.includes(newStatus)) {
+      return NextResponse.json({ error: `Cannot change status from ${current} to ${newStatus}` }, { status: 400 });
+    }
+    update.status = newStatus;
+    const nowIso = new Date().toISOString();
+    if (newStatus === "sent" || newStatus === "billed") {
+      update.sent_at = nowIso;
+      update.first_sent_at = bill.first_sent_at || nowIso;
+      update.last_sent_at = nowIso;
+    }
+    if (newStatus === "paid") {
+      update.paid_at = nowIso;
+      update.balance_cents = 0;
+    }
+    if (newStatus === "written_off") {
+      update.written_off_at = nowIso;
+      update.balance_cents = 0;
+      if (body.writeoffReason != null) update.writeoff_reason = String(body.writeoffReason).slice(0, 500);
+    }
+  }
+
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: "No valid updates provided" }, { status: 400 });
   }
 
   const { data: updated, error } = await supabaseAdmin
