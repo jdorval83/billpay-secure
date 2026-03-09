@@ -112,9 +112,26 @@ export default function BillDetailPage() {
     }
   };
 
-  const canEdit = bill && ["draft", "ready"].includes((bill.status || "").toLowerCase());
+  const canEdit = bill && ["draft", "ready", "past_due"].includes((bill.status || "").toLowerCase());
   const canMarkSent = bill && ["draft", "ready"].includes((bill.status || "").toLowerCase());
   const canMarkPaid = bill && ["billed", "past_due", "finalized", "sent"].includes((bill.status || "").toLowerCase());
+  const canResend = bill && ["billed", "past_due", "finalized", "sent"].includes((bill.status || "").toLowerCase());
+
+  const handleResend = async () => {
+    if (!bill) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/bills/${bill.id}/resend`, { method: "POST", credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to resend");
+      setMessage({ type: "success", text: data.message || "Payment link sent via text." });
+    } catch (e) {
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to resend" });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleSaveEdit = async () => {
     if (!bill) return;
@@ -366,12 +383,26 @@ export default function BillDetailPage() {
                     type="button"
                     onClick={() => updateStatus("paid")}
                     disabled={busy}
-                    className="btn-primary w-full"
+                    className={`w-full py-2.5 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                      (bill.status || "").toLowerCase() === "past_due"
+                        ? "bg-rose-600 hover:bg-rose-700 text-white"
+                        : "btn-primary"
+                    }`}
                   >
                     {busy ? "Updating…" : "Mark as Paid"}
                   </button>
                 )}
-                {!canMarkSent && !canMarkPaid && (
+                {canResend && (
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    disabled={busy}
+                    className="btn-secondary w-full"
+                  >
+                    {busy ? "Sending…" : "Resend payment link"}
+                  </button>
+                )}
+                {!canMarkSent && !canMarkPaid && !canResend && (
                   <p className="text-sm text-slate-500">No actions available for this status.</p>
                 )}
               </div>

@@ -266,7 +266,7 @@ export default function DashboardPage() {
 
         <div className="card p-6 mb-8">
           <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Aging by week (outstanding)</h2>
-          <p className="text-xs text-slate-500 mb-4">Click a bar for details. Current = not yet overdue. Week 1 = 1–7 days overdue, etc.</p>
+          <p className="text-xs text-slate-500 mb-4">Click a bar for details. Current = not yet past due. Week 1 = 1–7 days past due, etc.</p>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={agingByWeek} margin={{ top: 12, right: 12, left: 12, bottom: 12 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />

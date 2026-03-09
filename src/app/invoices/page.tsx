@@ -82,7 +82,7 @@ export default function InvoicesPage() {
 
   const handleDeleteSelected = async () => {
     if (!canDelete) return;
-    if (!window.confirm(`Delete ${selectedInvoices.length} invoice${selectedInvoices.length === 1 ? "" : "s"}? This cannot be undone.`)) {
+    if (!window.confirm(`Delete ${selectedInvoices.length} sent bill${selectedInvoices.length === 1 ? "" : "s"}? This cannot be undone.`)) {
       return;
     }
     setDeleting(true);
@@ -93,7 +93,7 @@ export default function InvoicesPage() {
         body: JSON.stringify({ ids: selectedInvoices.map((i) => i.id) }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to delete invoices");
+      if (!res.ok) throw new Error(data.error || "Failed to delete sent bills");
       setInvoices((prev) => prev.filter((i) => !selectedIds.has(i.id)));
       setSelectedIds(new Set());
     } catch (e) {
@@ -108,7 +108,7 @@ export default function InvoicesPage() {
     <main className="page-container">
       <div className="content-max">
         <div className="flex items-center justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Invoices</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Sent bills</h1>
           {canDelete ? (
             <button
               type="button"
@@ -129,8 +129,8 @@ export default function InvoicesPage() {
           </div>
         ) : invoices.length === 0 ? (
           <div className="card p-12 text-center">
-            <p className="text-slate-600 mb-4">No invoices yet.</p>
-            <p className="text-sm text-slate-500">Select bills on the Bills page and use &quot;Create invoice&quot; to add them to an invoice.</p>
+            <p className="text-slate-600 mb-4">No sent bills yet.</p>
+            <p className="text-sm text-slate-500">Select bills on the Bills page and use &quot;Send bill&quot; to create a PDF and send to customers.</p>
           </div>
         ) : (
           <>
@@ -139,7 +139,7 @@ export default function InvoicesPage() {
                 type="search"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                placeholder="Search by invoice # or customer…"
+                placeholder="Search by sent bill # or customer…"
                 className="input flex-1 min-w-[200px] max-w-xs"
               />
               <input
@@ -185,7 +185,7 @@ export default function InvoicesPage() {
                   <th className="w-10 p-3 text-center">
                     <span className="sr-only">Select</span>
                   </th>
-                  <th className="p-3 font-semibold text-slate-700">Invoice #</th>
+                  <th className="p-3 font-semibold text-slate-700">Sent bill #</th>
                   <th className="p-3 font-semibold text-slate-700">Customer</th>
                   <th className="p-3 font-semibold text-slate-700">Issued</th>
                   <th className="p-3 font-semibold text-slate-700">Due</th>
@@ -196,7 +196,7 @@ export default function InvoicesPage() {
               </thead>
               <tbody>
                 {filteredInvoices.length === 0 ? (
-                  <tr><td colSpan={8} className="p-6 text-center text-slate-500">No invoices match your search.</td></tr>
+                  <tr><td colSpan={8} className="p-6 text-center text-slate-500">No sent bills match your search.</td></tr>
                 ) : (
                 paginatedInvoices.map((inv) => (
                   <tr

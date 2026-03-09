@@ -76,7 +76,7 @@ export default function Nav() {
           {link("/customers", "Customers")}
           {link("/bills", "Bills")}
           {link("/templates", "Templates")}
-          {link("/invoices", "Invoices")}
+          {link("/invoices", "Sent bills")}
           {link("/reports", "Reports")}
           {link("/settings", "Settings")}
           {link("/admin", "Admin")}

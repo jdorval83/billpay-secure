@@ -8,7 +8,7 @@ const PROTECTED_PATHS = [
   "/dashboard",
   "/bills",
   "/customers",
-  "/invoices",
+  "/invoices", // Sent bills (UI label)
   "/templates",
   "/reports",
   "/settings",

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getBusinessIdForRequest } from "@/lib/tenant";
 
-type Recipient = { phone: string; customerName: string; amountCents: number; dueDate: string };
+type Recipient = { phone: string; customerName: string; amountCents: number; dueDate: string; paymentUrl?: string };
 
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
@@ -47,7 +47,9 @@ export async function POST(request: Request) {
       results.push({ phone: r.phone, ok: false, error: "Invalid phone" });
       continue;
     }
-    const bodyText = `Hi ${r.customerName}, this is a friendly reminder that you have an outstanding balance of ${amountStr(r.amountCents)} (due ${r.dueDate}). Please reach out if you have questions.`;
+    const bodyText = r.paymentUrl
+      ? `Hi ${r.customerName}, reminder: you have an outstanding balance of ${amountStr(r.amountCents)} (due ${r.dueDate}). Pay here: ${r.paymentUrl}`
+      : `Hi ${r.customerName}, this is a friendly reminder that you have an outstanding balance of ${amountStr(r.amountCents)} (due ${r.dueDate}). Please reach out if you have questions.`;
 
     try {
       await client.messages.create({

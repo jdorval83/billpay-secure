@@ -176,6 +176,22 @@ function BillsPageContent() {
   const canCreateInvoice = selectedBills.length > 0 && sameCustomer;
   const canDelete = selectedBills.length > 0;
 
+  const handleResendOne = async (bill: Bill) => {
+    setActioningId(bill.id);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/bills/${bill.id}/resend`, { method: "POST", credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to resend");
+      setMessage({ type: "success", text: data.message || "Payment link sent." });
+      fetchBills();
+    } catch (e) {
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to resend" });
+    } finally {
+      setActioningId(null);
+    }
+  };
+
   const updateOneStatus = async (bill: Bill, status: string, writeoffReason?: string | null) => {
     setActioningId(bill.id);
     setMessage(null);
@@ -259,12 +275,12 @@ function BillsPageContent() {
         body: JSON.stringify({ customerId, billIds }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to create invoice");
-      setMessage({ type: "success", text: "Invoice created. View it on the Invoices page." });
+      if (!res.ok) throw new Error(data.error || "Failed to create sent bill");
+      setMessage({ type: "success", text: "Sent bill created. View it on the Sent bills page." });
       setSelectedIds(new Set());
       fetchBills();
     } catch (e) {
-      setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to create invoice" });
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to create sent bill" });
     } finally {
       setCreatingInvoice(false);
     }
@@ -322,11 +338,12 @@ function BillsPageContent() {
                   try {
                     const r = await fetch("/api/reminders/blast", { credentials: "include" });
                     const d = await r.json();
-                    const recipients = (d.outstanding || []).map((x: { phone: string; customerName: string; amountCents: number; dueDate: string }) => ({
+                    const recipients = (d.outstanding || []).map((x: { phone: string; customerName: string; amountCents: number; dueDate: string; paymentUrl?: string }) => ({
                       phone: x.phone,
                       customerName: x.customerName,
                       amountCents: x.amountCents,
                       dueDate: x.dueDate,
+                      paymentUrl: x.paymentUrl,
                     }));
                     setBlastReminderData({ count: recipients.length, recipients });
                     setBlastReminderModal("confirm");
@@ -539,7 +556,7 @@ function BillsPageContent() {
                       <input type="checkbox" checked={selectedIds.has(b.id)} onChange={() => toggleSelect(b.id)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                     </td>
                     <td className="p-3 font-medium text-slate-900">{(b.customers as { name?: string })?.name ?? "—"}</td>
-                    <td className="p-3 text-slate-600">{b.description || "Invoice"}</td>
+                    <td className="p-3 text-slate-600">{b.description || "Bill"}</td>
                     <td className="p-3 font-medium text-slate-900">{format(b.amount_cents)}</td>
                     <td className="p-3 text-slate-600">{b.due_date}</td>
                     <td className="p-3"><StatusBadge bill={b} /></td>
@@ -550,7 +567,28 @@ function BillsPageContent() {
                           <button type="button" onClick={() => updateOneStatus(b, "billed")} disabled={actioningId === b.id} className="text-sm font-medium text-emerald-600 hover:text-emerald-800 px-2 py-1 rounded hover:bg-emerald-50 disabled:opacity-50">{actioningId === b.id ? "…" : "Send"}</button>
                         )}
                         {["billed", "past_due", "finalized", "sent"].includes((b.status || "").toLowerCase()) && (
-                          <button type="button" onClick={() => updateOneStatus(b, "paid")} disabled={actioningId === b.id} className="text-sm font-medium text-emerald-600 hover:text-emerald-800 px-2 py-1 rounded hover:bg-emerald-50 disabled:opacity-50">{actioningId === b.id ? "…" : "Paid"}</button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => updateOneStatus(b, "paid")}
+                              disabled={actioningId === b.id}
+                              className={`text-sm font-medium px-2 py-1 rounded disabled:opacity-50 ${
+                                (b.status || "").toLowerCase() === "past_due"
+                                  ? "text-rose-600 hover:text-rose-800 hover:bg-rose-50"
+                                  : "text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50"
+                              }`}
+                            >
+                              {actioningId === b.id ? "…" : "Paid"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleResendOne(b); }}
+                              disabled={actioningId === b.id}
+                              className="text-sm font-medium text-slate-600 hover:text-slate-800 px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-50"
+                            >
+                              {actioningId === b.id ? "…" : "Resend"}
+                            </button>
+                          </>
                         )}
                         <button type="button" onClick={() => handleDeleteOne(b)} disabled={actioningId === b.id} className="text-sm font-medium text-slate-500 hover:text-rose-600 px-2 py-1 rounded hover:bg-rose-50 disabled:opacity-50">{actioningId === b.id ? "…" : "Delete"}</button>
                       </div>

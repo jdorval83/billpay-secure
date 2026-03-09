@@ -9,6 +9,7 @@ type Business = {
   support_email: string | null;
   invoice_footer: string | null;
   past_due_days?: number;
+  reminder_interval_days?: number;
 };
 
 export default function SettingsPage() {
@@ -18,6 +19,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [footer, setFooter] = useState("");
   const [pastDueDays, setPastDueDays] = useState<number>(0);
+  const [reminderIntervalDays, setReminderIntervalDays] = useState<number>(0);
 
   useEffect(() => {
     setLoading(true);
@@ -29,6 +31,7 @@ export default function SettingsPage() {
           setBusiness(data.business);
           setFooter(data.business.invoice_footer || "");
           setPastDueDays(typeof data.business.past_due_days === "number" ? data.business.past_due_days : 0);
+          setReminderIntervalDays(typeof data.business.reminder_interval_days === "number" ? data.business.reminder_interval_days : 0);
         } else {
           throw new Error(data.error || "No business data");
         }
@@ -73,12 +76,13 @@ export default function SettingsPage() {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ past_due_days: pastDueDays }),
+        body: JSON.stringify({ past_due_days: pastDueDays, reminder_interval_days: reminderIntervalDays }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to save");
       setBusiness(json.business);
       setPastDueDays(typeof json.business?.past_due_days === "number" ? json.business.past_due_days : pastDueDays);
+      setReminderIntervalDays(typeof json.business?.reminder_interval_days === "number" ? json.business.reminder_interval_days : reminderIntervalDays);
       setMessage("Billing settings saved.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Failed to save");
@@ -101,7 +105,7 @@ export default function SettingsPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to save");
       setBusiness(json.business);
-      setMessage("Invoice footer saved.");
+      setMessage("Sent bill footer saved.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Failed to save");
     } finally {
@@ -171,7 +175,7 @@ export default function SettingsPage() {
                 className="text-sm"
               />
               <p className="mt-1 text-xs text-slate-500">
-                JPG or PNG, square works best. Used in the app header and on invoice PDFs.
+                JPG or PNG, square works best. Used in the app header and on sent bill PDFs.
               </p>
             </div>
           </div>
@@ -190,6 +194,18 @@ export default function SettingsPage() {
             />
             <p className="mt-1 text-xs text-slate-500">Number of days after the due date before a bill is considered past due. 0 = due date is the cutoff.</p>
           </div>
+          <div>
+            <label className="label">Recurring reminder interval (days)</label>
+            <input
+              type="number"
+              min={0}
+              max={365}
+              value={reminderIntervalDays}
+              onChange={(e) => setReminderIntervalDays(Math.max(0, Math.min(365, parseInt(e.target.value, 10) || 0)))}
+              className="input w-24"
+            />
+            <p className="mt-1 text-xs text-slate-500">Send automatic text reminders with payment links every N days for past-due bills. 0 = disabled.</p>
+          </div>
           <div className="flex justify-end">
             <button type="button" onClick={handleSaveBilling} disabled={saving} className="btn-primary">
               {saving ? "Saving…" : "Save"}
@@ -197,7 +213,7 @@ export default function SettingsPage() {
           </div>
         </div>
         <div className="card p-6 space-y-3">
-          <h2 className="text-sm font-semibold text-slate-800">Invoice footer</h2>
+          <h2 className="text-sm font-semibold text-slate-800">Sent bill footer</h2>
           <textarea
             value={footer}
             onChange={(e) => setFooter(e.target.value)}
