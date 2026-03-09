@@ -278,10 +278,11 @@ function BillsPageContent() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create sent bill");
-      setMessage({ type: "success", text: "Sent bill created. View it on the Sent bills page." });
+      setMessage({ type: "success", text: "Bill sent." });
       setSelectedIds(new Set());
       setStatusFilter("");
       fetchBills();
+      router.push("/invoices");
     } catch (e) {
       setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to create sent bill" });
     } finally {
@@ -500,11 +501,6 @@ function BillsPageContent() {
                     {(creatingInvoice || bulkActionLoading) ? "Sending…" : "SEND BILL"}
                   </button>
                 )}
-                {selectedBills.every((b) => ["billed", "past_due", "overdue", "finalized", "sent"].includes((b.status || "").toLowerCase())) && (
-                  <button type="button" onClick={() => handleBulkStatus("paid")} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5">
-                    {bulkActionLoading ? "Updating…" : "Mark as Paid"}
-                  </button>
-                )}
                 <button type="button" onClick={() => selectedBills.length === 1 && router.push(`/bills/${selectedBills[0].id}`)} disabled={selectedBills.length !== 1} className="btn-secondary text-sm py-1.5" title={selectedBills.length === 1 ? "Edit" : "Select one to edit"}>
                   EDIT
                 </button>
@@ -575,18 +571,6 @@ function BillsPageContent() {
                         )}
                         {["billed", "past_due", "overdue", "finalized", "sent"].includes((b.status || "").toLowerCase()) && (
                           <>
-                            <button
-                              type="button"
-                              onClick={() => updateOneStatus(b, "paid")}
-                              disabled={actioningId === b.id}
-                              className={`text-sm font-medium px-2 py-1 rounded disabled:opacity-50 ${
-                                ["past_due", "overdue"].includes((b.status || "").toLowerCase())
-                                  ? "text-rose-600 hover:text-rose-800 hover:bg-rose-50"
-                                  : "text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50"
-                              }`}
-                            >
-                              {actioningId === b.id ? "…" : "Paid"}
-                            </button>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleResendOne(b); }}
