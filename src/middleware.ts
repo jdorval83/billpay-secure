@@ -55,8 +55,12 @@ export async function middleware(request: NextRequest) {
   // Don't redirect signup or auth APIs — keep them on root so signup works
   if (isRootDomain && (pathname === "/signup" || pathname.startsWith("/api/auth/"))) {
     const { user, response } = await updateSession(request);
-    // Redirect signed-in users away from signup
+    // Redirect signed-in users away from signup to their subdomain
     if (pathname === "/signup" && user) {
+      const sub = user.user_metadata?.business_subdomain;
+      if (sub && typeof sub === "string") {
+        return NextResponse.redirect(new URL(`https://${sub}.billpaysecure.com/dashboard`), 307);
+      }
       return NextResponse.redirect(new URL("/dashboard", request.url), 307);
     }
     return response;

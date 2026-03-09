@@ -70,6 +70,7 @@ function BillsPageContent() {
   const [blastReminderModal, setBlastReminderModal] = useState<"confirm" | null>(null);
   const [blastReminderData, setBlastReminderData] = useState<{ count: number; recipients: { phone: string; customerName: string; amountCents: number; dueDate: string }[] } | null>(null);
   const [blastSending, setBlastSending] = useState(false);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   const outstandingCount = useMemo(() =>
     bills.filter((b) => (b.balance_cents ?? 0) > 0 && ["finalized", "billed", "sent"].includes((b.status || "").toLowerCase())).length,
@@ -149,6 +150,24 @@ function BillsPageContent() {
     });
   };
 
+  const selectableOnPage = paginatedBills.filter((b) => canSelectForInvoice(b) || canFinalize(b) || (b.status || "").toLowerCase() === "finalized" || ["sent", "billed"].includes((b.status || "").toLowerCase()));
+  const allSelectedOnPage = selectableOnPage.length > 0 && selectableOnPage.every((b) => selectedIds.has(b.id));
+  const toggleSelectAll = () => {
+    if (allSelectedOnPage) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        selectableOnPage.forEach((b) => next.delete(b.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        selectableOnPage.forEach((b) => next.add(b.id));
+        return next;
+      });
+    }
+  };
+
   const selectedBills = filteredBills.filter((b) => selectedIds.has(b.id));
   const sameCustomer = selectedBills.length > 0 && selectedBills.every((b) => b.customer_id === selectedBills[0].customer_id);
   const canCreateInvoice = selectedBills.length > 0 && sameCustomer;
@@ -211,6 +230,37 @@ function BillsPageContent() {
   const handleWriteOff = async (bill: Bill) => {
     const reason = window.prompt("Reason for write-off (optional):", "Bad debt");
     await updateStatus(bill, "written_off", { writeoffReason: reason ?? null });
+  };
+
+  const handleBulkStatus = async (status: string, writeoffReason?: string | null) => {
+    const ids = selectedBills.map((b) => b.id);
+    const eligible = selectedBills.filter((b) => {
+      const s = (b.status || "").toLowerCase();
+      const allowed = status === "finalized" ? ["draft"] : status === "sent" ? ["finalized"] : ["sent", "billed"];
+      return allowed.includes(s);
+    });
+    if (eligible.length === 0) {
+      setMessage({ type: "error", text: `No selected bills can be ${status.replace("_", " ")}.` });
+      return;
+    }
+    setBulkActionLoading(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/bills", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: eligible.map((b) => b.id), status, writeoffReason }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setMessage({ type: "success", text: `${data.updated ?? eligible.length} bill(s) updated.` });
+      setSelectedIds(new Set());
+      fetchBills();
+    } catch (e) {
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed" });
+    } finally {
+      setBulkActionLoading(false);
+    }
   };
 
   const handleCreateInvoice = async () => {
@@ -445,11 +495,50 @@ function BillsPageContent() {
                 </button>
               )}
             </div>
+            {selectedBills.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <span className="text-sm font-medium text-slate-700">{selectedBills.length} selected</span>
+                {selectedBills.every((b) => (b.status || "").toLowerCase() === "draft") && (
+                  <button type="button" onClick={() => handleBulkStatus("finalized")} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5">
+                    {bulkActionLoading ? "Updating…" : "Finalize all"}
+                  </button>
+                )}
+                {selectedBills.every((b) => (b.status || "").toLowerCase() === "finalized") && (
+                  <button type="button" onClick={() => handleBulkStatus("sent")} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5">
+                    {bulkActionLoading ? "Updating…" : "Mark sent all"}
+                  </button>
+                )}
+                {selectedBills.every((b) => ["sent", "billed"].includes((b.status || "").toLowerCase())) && (
+                  <>
+                    <button type="button" onClick={() => handleBulkStatus("paid")} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5">
+                      {bulkActionLoading ? "Updating…" : "Mark paid all"}
+                    </button>
+                    <button type="button" onClick={() => handleBulkStatus("written_off", window.prompt("Reason (optional):") ?? undefined)} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5 text-rose-700">
+                      {bulkActionLoading ? "Updating…" : "Write off all"}
+                    </button>
+                  </>
+                )}
+                {canCreateInvoice && (
+                  <button type="button" onClick={handleCreateInvoice} disabled={creatingInvoice} className="btn-primary text-sm py-1.5">
+                    {creatingInvoice ? "Creating…" : "Create invoice"}
+                  </button>
+                )}
+                <button type="button" onClick={() => setSelectedIds(new Set())} className="text-sm text-slate-500 hover:text-slate-700">
+                  Clear
+                </button>
+              </div>
+            )}
             <div className="card overflow-hidden">
             <table className="w-full">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200">
-                  <th className="w-10 p-3 text-center"><span className="sr-only">Select</span></th>
+                  <th className="w-10 p-3 text-center">
+                    {selectableOnPage.length > 0 ? (
+                      <input type="checkbox" checked={allSelectedOnPage} onChange={toggleSelectAll} className="h-4 w-4 rounded border-slate-300 text-emerald-600" title="Select all" />
+                    ) : (
+                      <span className="sr-only">Select</span>
+                    )}
+                  </th>
                   <th className="text-left p-3 text-sm font-semibold text-slate-700">Customer</th>
                   <th className="text-left p-3 text-sm font-semibold text-slate-700">Description</th>
                   <th className="text-left p-3 text-sm font-semibold text-slate-700">Amount</th>
@@ -471,8 +560,8 @@ function BillsPageContent() {
                       router.push(`/bills/${b.id}`);
                     }}
                   >
-                    <td className="p-3 text-center">
-                      {canSelectForInvoice(b) ? (
+                    <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      {(canSelectForInvoice(b) || canFinalize(b) || (b.status || "").toLowerCase() === "finalized" || ["sent", "billed"].includes((b.status || "").toLowerCase())) ? (
                         <input type="checkbox" checked={selectedIds.has(b.id)} onChange={() => toggleSelect(b.id)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                       ) : (
                         <span className="text-slate-300">—</span>

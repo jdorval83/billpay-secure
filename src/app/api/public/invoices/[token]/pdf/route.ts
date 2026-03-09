@@ -7,6 +7,7 @@ type RouteParams = {
 };
 
 export async function GET(request: Request, { params }: RouteParams) {
+  try {
   const { token } = await params;
 
   if (!token) {
@@ -169,5 +170,11 @@ export async function GET(request: Request, { params }: RouteParams) {
       )}.pdf"`,
     },
   });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "PDF generation failed" },
+      { status: 500 }
+    );
+  }
 }
 

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase";
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const stripeSecretKey = (process.env.STRIPE_SECRET_KEY || "").trim();
 const currency = process.env.STRIPE_CURRENCY || "usd";
 
 function getBaseUrl(request: Request): string {
@@ -16,7 +16,7 @@ function getBaseUrl(request: Request): string {
 if (!stripeSecretKey) {
   throw new Error("STRIPE_SECRET_KEY is not set");
 }
-
+// Ensure no trailing whitespace/newlines that break Stripe SDK
 const stripe = new Stripe(stripeSecretKey);
 
 export async function GET(

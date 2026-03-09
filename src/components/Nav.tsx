@@ -32,7 +32,7 @@ export default function Nav() {
       });
   }, []);
 
-  if (pathname === "/" || pathname.startsWith("/public")) return null;
+  if (pathname === "/" || pathname === "/signup" || pathname.startsWith("/public")) return null;
 
   const link = (href: string, label: string) => (
     <Link
