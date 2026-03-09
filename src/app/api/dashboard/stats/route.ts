@@ -7,12 +7,18 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const fromParam = searchParams.get("from");
   const toParam = searchParams.get("to");
-  const weeksParam = Math.min(26, Math.max(1, parseInt(searchParams.get("weeks") || "6", 10)));
+  const weeksParam = Math.min(26, Math.max(1, parseInt(searchParams.get("weeks") || "4", 10)));
 
   const { data: bills } = await supabaseAdmin
     .from("bills")
-    .select("id, amount_cents, balance_cents, status, due_date, paid_at, created_at")
+    .select("id, amount_cents, balance_cents, status, due_date, paid_at, created_at, first_sent_at, customer_id")
     .eq("business_id", businessId);
+
+  const { data: customersData } = await supabaseAdmin
+    .from("customers")
+    .select("id, name")
+    .eq("business_id", businessId);
+  const customerMap = new Map((customersData || []).map((c: { id: string; name: string }) => [c.id, c.name]));
 
   let paymentRecords: { amount_cents: number; paid_at: string }[] = [];
   const prRes = await supabaseAdmin
@@ -23,18 +29,13 @@ export async function GET(request: Request) {
     paymentRecords = prRes.data as { amount_cents: number; paid_at: string }[];
   }
 
-  const billList = (bills || []) as { amount_cents: number; balance_cents: number; status: string; paid_at: string | null; due_date: string; created_at: string }[];
+  type BillRow = { amount_cents: number; balance_cents: number; status: string; paid_at: string | null; due_date: string; created_at: string; first_sent_at?: string | null; customer_id?: string };
+  const billList = (bills || []) as BillRow[];
   const records = paymentRecords;
 
-  const totalCharges = billList.reduce((s, b) => s + (b.amount_cents || 0), 0);
   const totalOutstanding = billList
     .filter((b) => (b.status || "").toLowerCase() !== "void" && (b.balance_cents ?? 0) > 0)
     .reduce((s, b) => s + (b.balance_cents || 0), 0);
-  const totalPayments = billList
-    .filter((b) => (b.status || "").toLowerCase() === "paid")
-    .reduce((s, b) => s + (b.amount_cents || 0), 0);
-  const totalRecordedPayments = records.reduce((s, r) => s + (r.amount_cents || 0), 0);
-  const totalPaymentsAll = totalPayments + totalRecordedPayments;
 
   const now = new Date();
   let rangeEnd = toParam ? new Date(toParam + "T23:59:59") : new Date(now);
@@ -45,6 +46,42 @@ export async function GET(request: Request) {
     rangeStart.setDate(rangeStart.getDate() - (weeksParam - 1) * 7);
     rangeStart.setHours(0, 0, 0, 0);
   }
+  const rangeStartISO = rangeStart.toISOString();
+  const rangeEndISO = rangeEnd.toISOString();
+  const rangeStartYMD = rangeStartISO.slice(0, 10);
+  const rangeEndYMD = rangeEndISO.slice(0, 10);
+
+  const billedInPeriod = billList
+    .filter((b) => b.created_at >= rangeStartISO && b.created_at <= rangeEndISO)
+    .reduce((s, b) => s + (b.amount_cents || 0), 0);
+  const paidBillsInPeriod = billList.filter(
+    (b) => (b.status || "").toLowerCase() === "paid" && b.paid_at && b.paid_at >= rangeStartISO && b.paid_at <= rangeEndISO
+  );
+  const paymentsFromBillsInPeriod = paidBillsInPeriod.reduce((s, b) => s + (b.amount_cents || 0), 0);
+  const paymentsFromRecordsInPeriod = records
+    .filter((r) => r.paid_at >= rangeStartYMD && r.paid_at <= rangeEndYMD)
+    .reduce((s, r) => s + (r.amount_cents || 0), 0);
+  const paymentsInPeriod = paymentsFromBillsInPeriod + paymentsFromRecordsInPeriod;
+
+  const daysToRemitByCustomer = new Map<string, { totalDays: number; count: number }>();
+  for (const b of billList) {
+    if ((b.status || "").toLowerCase() !== "paid" || !b.paid_at) continue;
+    const startDate = b.first_sent_at || b.created_at;
+    if (!startDate) continue;
+    const start = new Date(startDate).getTime();
+    const paid = new Date(b.paid_at).getTime();
+    const days = Math.round((paid - start) / (1000 * 60 * 60 * 24));
+    const cid = b.customer_id || "";
+    if (!cid) continue;
+    const existing = daysToRemitByCustomer.get(cid) || { totalDays: 0, count: 0 };
+    daysToRemitByCustomer.set(cid, { totalDays: existing.totalDays + days, count: existing.count + 1 });
+  }
+  const daysToRemit = Array.from(daysToRemitByCustomer.entries()).map(([customerId, { totalDays, count }]) => ({
+    customerId,
+    customerName: customerMap.get(customerId) || "—",
+    avgDaysToRemit: Math.round(totalDays / count),
+    billCount: count,
+  })).sort((a, b) => a.avgDaysToRemit - b.avgDaysToRemit);
 
   const weeks: { week: string; label: string; charges: number; payments: number }[] = [];
   for (let i = weeksParam - 1; i >= 0; i--) {
@@ -97,9 +134,10 @@ export async function GET(request: Request) {
   });
 
   return NextResponse.json({
-    totalCharges,
-    totalPayments: totalPaymentsAll,
     totalOutstanding,
+    billedInPeriod,
+    paymentsInPeriod,
+    daysToRemit,
     byWeek: weeks,
     aging,
     rangeFrom: rangeStart.toISOString().slice(0, 10),

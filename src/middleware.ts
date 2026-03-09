@@ -52,25 +52,25 @@ export async function middleware(request: NextRequest) {
   const isRootDomain =
     withoutPort === PRODUCTION_DOMAIN || withoutPort === `www.${PRODUCTION_DOMAIN}`;
 
-  // Don't redirect signup or auth APIs — keep them on root so signup works
-  if (isRootDomain && (pathname === "/signup" || pathname.startsWith("/api/auth/"))) {
+  // Root domain (billpaysecure.com, www) = login/landing. Do NOT redirect.
+  // Signup: redirect signed-in users away to their subdomain
+  if (isRootDomain) {
     const { user, response } = await updateSession(request);
-    // Redirect signed-in users away from signup to their subdomain
     if (pathname === "/signup" && user) {
       const sub = user.user_metadata?.business_subdomain;
       if (sub && typeof sub === "string") {
-        return NextResponse.redirect(new URL(`https://${sub}.billpaysecure.com/dashboard`), 307);
+        return NextResponse.redirect(new URL(`https://${sub}.${PRODUCTION_DOMAIN}/`), 307);
       }
-      return NextResponse.redirect(new URL("/dashboard", request.url), 307);
+      return NextResponse.redirect(new URL("/", request.url), 307);
+    }
+    // Root serves login, signup, etc. — run auth check for protected paths
+    if (isProtectedPath(pathname) && !user) {
+      return NextResponse.redirect(new URL("/", request.url), 307);
+    }
+    if (isProtectedApi(pathname) && !isPublicPath(pathname) && !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     return response;
-  }
-
-  // Redirect root domain to test subdomain (except signup handled above)
-  if (isRootDomain) {
-    const base = `https://${TEST_SUBDOMAIN}.${PRODUCTION_DOMAIN}`;
-    const path = pathname + request.nextUrl.search;
-    return NextResponse.redirect(base + path, 307);
   }
 
   const { user, response } = await updateSession(request);

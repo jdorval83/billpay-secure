@@ -25,9 +25,10 @@ type Bill = {
   customers?: { name?: string | null } | null;
 };
 type DashboardStats = {
-  totalCharges: number;
-  totalPayments: number;
   totalOutstanding: number;
+  billedInPeriod: number;
+  paymentsInPeriod: number;
+  daysToRemit: { customerId: string; customerName: string; avgDaysToRemit: number; billCount: number }[];
   byWeek: { week: string; label: string; charges: number; payments: number }[];
   aging: { bucket: string; amountCents: number }[];
   rangeFrom?: string;
@@ -54,7 +55,8 @@ export default function DashboardPage() {
   const recordPaymentRef = useRef<HTMLFormElement>(null);
   const [chartFrom, setChartFrom] = useState("");
   const [chartTo, setChartTo] = useState("");
-  const [chartWeeks, setChartWeeks] = useState(6);
+  const [chartWeeks, setChartWeeks] = useState(4);
+  const [outstandingExpanded, setOutstandingExpanded] = useState(false);
   const [showBills, setShowBills] = useState(true);
   const [showPayments, setShowPayments] = useState(true);
   const [showAging, setShowAging] = useState(true);
@@ -202,19 +204,90 @@ export default function DashboardPage() {
           </Link>
         </div>
         {stats && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <div className="card p-6">
-              <p className="text-sm font-medium text-slate-600">Total billed (all time)</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{formatMoney(stats.totalCharges)}</p>
+          <div className="space-y-4 mb-8">
+            <div
+              className={`card p-6 cursor-pointer select-none transition-colors ${
+                outstandingExpanded ? "ring-2 ring-amber-400" : "hover:ring-2 hover:ring-amber-200"
+              }`}
+              onClick={() => setOutstandingExpanded(!outstandingExpanded)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && setOutstandingExpanded(!outstandingExpanded)}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Total outstanding</p>
+                  <p className="text-3xl font-bold text-amber-700 mt-1">{formatMoney(stats.totalOutstanding)}</p>
+                  <p className="text-xs text-slate-500 mt-2">Click to drill down</p>
+                </div>
+                <span className="text-2xl text-amber-600">{outstandingExpanded ? "▲" : "▼"}</span>
+              </div>
+              {outstandingExpanded && (
+                <div className="mt-6 pt-6 border-t border-slate-200">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Aging buckets</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {stats.aging.map((a) => (
+                      <div key={a.bucket} className="rounded-lg bg-slate-50 p-3">
+                        <p className="text-xs font-medium text-slate-600">{a.bucket} days</p>
+                        <p className="text-lg font-bold text-slate-900">{formatMoney(a.amountCents)}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <Link href="/bills" className="inline-block mt-4 text-sm font-medium text-amber-700 hover:text-amber-800">
+                    View outstanding bills →
+                  </Link>
+                </div>
+              )}
             </div>
-            <div className="card p-6">
-              <p className="text-sm font-medium text-slate-600">Total payments received</p>
-              <p className="text-2xl font-bold text-emerald-700 mt-1">{formatMoney(stats.totalPayments)}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="card p-6">
+                <p className="text-sm font-medium text-slate-600">
+                  Billed
+                  {stats.rangeFrom && stats.rangeTo && (
+                    <span className="block text-xs text-slate-500 font-normal mt-0.5">
+                      {stats.rangeFrom} – {stats.rangeTo}
+                    </span>
+                  )}
+                </p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{formatMoney(stats.billedInPeriod)}</p>
+              </div>
+              <div className="card p-6">
+                <p className="text-sm font-medium text-slate-600">
+                  Payments received
+                  {stats.rangeFrom && stats.rangeTo && (
+                    <span className="block text-xs text-slate-500 font-normal mt-0.5">
+                      {stats.rangeFrom} – {stats.rangeTo}
+                    </span>
+                  )}
+                </p>
+                <p className="text-2xl font-bold text-emerald-700 mt-1">{formatMoney(stats.paymentsInPeriod)}</p>
+              </div>
             </div>
-            <div className="card p-6">
-              <p className="text-sm font-medium text-slate-600">Total outstanding</p>
-              <p className="text-2xl font-bold text-amber-700 mt-1">{formatMoney(stats.totalOutstanding)}</p>
-            </div>
+            {stats.daysToRemit && stats.daysToRemit.length > 0 && (
+              <div className="card p-6">
+                <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Days to remit (avg time clients take to pay)</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-slate-500 border-b border-slate-200">
+                        <th className="pb-2 font-medium">Client</th>
+                        <th className="pb-2 font-medium text-right">Avg days</th>
+                        <th className="pb-2 font-medium text-right">Bills</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.daysToRemit.map((r) => (
+                        <tr key={r.customerId} className="border-b border-slate-100">
+                          <td className="py-2 font-medium text-slate-800">{r.customerName}</td>
+                          <td className="py-2 text-right">{r.avgDaysToRemit} days</td>
+                          <td className="py-2 text-right text-slate-500">{r.billCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {stats && (
@@ -254,7 +327,7 @@ export default function DashboardPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => { setChartFrom(""); setChartTo(""); setChartWeeks(6); }}
+                  onClick={() => { setChartFrom(""); setChartTo(""); setChartWeeks(4); }}
                   className="text-sm text-slate-500 hover:text-slate-700"
                 >
                   Reset

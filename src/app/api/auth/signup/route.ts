@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: authError.message }, { status: 400 });
     }
 
-    const loginUrl = `https://${slug}.${PRODUCTION_DOMAIN}/dashboard`;
+    const loginUrl = `https://${slug}.${PRODUCTION_DOMAIN}/`;
 
     return NextResponse.json({
       success: true,
