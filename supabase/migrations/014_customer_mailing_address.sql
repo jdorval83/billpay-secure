@@ -1,0 +1,6 @@
+-- Add mailing address fields to customers
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS address_line1 text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS address_line2 text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS city text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS state text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS postal_code text;

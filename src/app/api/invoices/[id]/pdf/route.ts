@@ -30,7 +30,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   ] = await Promise.all([
     supabaseAdmin
       .from("invoices")
-      .select("*, customers(name, email, phone)")
+      .select("*, customers(name, email, phone, address_line1, address_line2, city, state, postal_code)")
       .eq("business_id", businessId)
       .eq("id", id)
       .single(),
@@ -65,7 +65,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       headers: {
         "Content-Type": "application/pdf",
         "Cache-Control": "private, no-cache, no-store",
-        "Content-Disposition": `inline; filename="${String(invoice.invoice_number || "invoice")}.pdf"`,
+        "Content-Disposition": `inline; filename="${String(invoice.invoice_number || "bill")}.pdf"`,
       },
     });
   } catch (err) {

@@ -71,7 +71,7 @@ export async function GET(
         price_data: {
           currency,
           product_data: {
-            name: invoice.invoice_number || "Invoice",
+            name: invoice.invoice_number || "Bill",
           },
           unit_amount: totalCents,
         },

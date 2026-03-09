@@ -99,7 +99,20 @@ export async function POST(request: Request) {
     const totalCents = subtotalCents + taxCents;
     const issuedAtValue = issuedAt ? new Date(issuedAt).toISOString() : new Date().toISOString();
     const dueAtValue = dueAt ? new Date(dueAt).toISOString() : issuedAtValue;
-    const invoiceNumber = `INV-${String(businessId).slice(0, 8)}-${Date.now()}`;
+    const year = new Date().getFullYear();
+    const prefix = `${year}-`;
+    const { data: existing } = await supabaseAdmin
+      .from("invoices")
+      .select("invoice_number")
+      .eq("business_id", businessId)
+      .like("invoice_number", `${prefix}%`)
+      .order("invoice_number", { ascending: false })
+      .limit(1);
+    const lastNum = existing?.[0]?.invoice_number;
+    const nextSeq = lastNum
+      ? (parseInt(lastNum.replace(prefix, ""), 10) || 0) + 1
+      : 1;
+    const invoiceNumber = `${prefix}${String(nextSeq).padStart(3, "0")}`;
     const snapshot = { customer, bills: billList, lineItems: baseLineItems };
     const publicToken = randomUUID();
 
@@ -109,7 +122,7 @@ export async function POST(request: Request) {
         business_id: businessId,
         customer_id: customerId,
         invoice_number: invoiceNumber,
-        status: "draft",
+        status: "sent",
         issued_at: issuedAtValue,
         due_at: dueAtValue,
         subtotal_cents: subtotalCents,

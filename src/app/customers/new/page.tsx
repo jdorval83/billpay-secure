@@ -8,6 +8,11 @@ export default function NewCustomerPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [smsConsent, setSmsConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -24,7 +29,17 @@ export default function NewCustomerPage() {
       const res = await fetch("/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, sms_consent: smsConsent }),
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim() || null,
+          phone: phone.trim() || null,
+          address_line1: addressLine1.trim() || null,
+          address_line2: addressLine2.trim() || null,
+          city: city.trim() || null,
+          state: state.trim() || null,
+          postal_code: postalCode.trim() || null,
+          sms_consent: smsConsent,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create customer");
@@ -54,6 +69,16 @@ export default function NewCustomerPage() {
           <div>
             <label className="label">Phone</label>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="input" placeholder="(555) 123-4567" />
+          </div>
+          <div>
+            <label className="label">Mailing address</label>
+            <input type="text" value={addressLine1} onChange={(e) => setAddressLine1(e.target.value)} className="input mb-2" placeholder="Street address" />
+            <input type="text" value={addressLine2} onChange={(e) => setAddressLine2(e.target.value)} className="input mb-2" placeholder="Apt, suite, etc. (optional)" />
+            <div className="flex gap-2">
+              <input type="text" value={city} onChange={(e) => setCity(e.target.value)} className="input flex-1" placeholder="City" />
+              <input type="text" value={state} onChange={(e) => setState(e.target.value)} className="input w-24" placeholder="State" />
+              <input type="text" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} className="input w-28" placeholder="ZIP" />
+            </div>
           </div>
           <div>
             <label className="flex items-start gap-3 cursor-pointer">

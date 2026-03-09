@@ -17,8 +17,8 @@ type InvoiceData = {
   subtotal_cents?: number | null;
   tax_cents?: number | null;
   total_cents?: number | null;
-  customers?: { name?: string; email?: string } | null;
-  snapshot?: { customer?: { name?: string; email?: string } };
+  customers?: { name?: string; email?: string; address_line1?: string; address_line2?: string; city?: string; state?: string; postal_code?: string } | null;
+  snapshot?: { customer?: { name?: string; email?: string; address_line1?: string; address_line2?: string; city?: string; state?: string; postal_code?: string } };
 };
 
 type BusinessData = {
@@ -55,7 +55,7 @@ export async function generateInvoicePdf(
   page.drawText(supportEmail, { x: 50, y, size: 10, font: helvetica, color: rgb(0.33, 0.33, 0.33) });
   y -= 24;
 
-  page.drawText(`Invoice ${invoice.invoice_number}`, {
+  page.drawText(`Bill ${invoice.invoice_number}`, {
     x: width - 150,
     y,
     size: 16,
@@ -67,6 +67,9 @@ export async function generateInvoicePdf(
   const customer = invoice.customers || invoice.snapshot?.customer;
   const custName = customer?.name || "—";
   const custEmail = customer?.email || "";
+  const addrLine1 = customer?.address_line1 || "";
+  const addrLine2 = customer?.address_line2 || "";
+  const addrCity = [customer?.city, customer?.state, customer?.postal_code].filter(Boolean).join(", ");
 
   page.drawText("Bill to:", { x: 50, y, size: 10, font: helvetica, color: rgb(0, 0, 0) });
   y -= 14;
@@ -76,9 +79,23 @@ export async function generateInvoicePdf(
     page.drawText(custEmail, { x: 50, y, size: 10, font: helvetica, color: rgb(0, 0, 0) });
     y -= 14;
   }
+  if (addrLine1 || addrCity) {
+    if (addrLine1) {
+      page.drawText(addrLine1.slice(0, 50), { x: 50, y, size: 10, font: helvetica, color: rgb(0, 0, 0) });
+      y -= 14;
+    }
+    if (addrLine2) {
+      page.drawText(addrLine2.slice(0, 50), { x: 50, y, size: 10, font: helvetica, color: rgb(0, 0, 0) });
+      y -= 14;
+    }
+    if (addrCity) {
+      page.drawText(addrCity.slice(0, 50), { x: 50, y, size: 10, font: helvetica, color: rgb(0, 0, 0) });
+      y -= 14;
+    }
+  }
   y -= 16;
 
-  page.drawText(`Invoice #: ${invoice.invoice_number}`, { x: 350, y: y + 28, size: 10, font: helvetica, color: rgb(0, 0, 0) });
+  page.drawText(`Bill #: ${invoice.invoice_number}`, { x: 350, y: y + 28, size: 10, font: helvetica, color: rgb(0, 0, 0) });
   page.drawText(`Issued: ${issuedDate}`, { x: 350, y: y + 14, size: 10, font: helvetica, color: rgb(0, 0, 0) });
   page.drawText(`Due: ${dueDate}`, { x: 350, y, size: 10, font: helvetica, color: rgb(0, 0, 0) });
   y -= 32;
@@ -118,7 +135,7 @@ export async function generateInvoicePdf(
   page.drawText(toMoney(total), { x: 450, y, size: 11, font: helveticaBold, color: rgb(0, 0, 0) });
   y -= 32;
 
-  const footer = business?.invoice_footer || "Thank you for your business. Please contact support if you have any questions about this invoice.";
+  const footer = business?.invoice_footer || "Thank you for your business. Please contact support if you have any questions about this bill.";
   page.drawText(footer.slice(0, 120), { x: 50, y, size: 9, font: helvetica, color: rgb(0.33, 0.33, 0.33) });
 
   return pdfDoc.save();

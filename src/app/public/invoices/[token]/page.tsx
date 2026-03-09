@@ -80,7 +80,7 @@ export default async function PublicInvoicePage({ params }: PageParams) {
         <div className="flex items-start justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 mb-1">
-              Invoice {invoice.invoice_number}
+              Bill {invoice.invoice_number}
             </h1>
             <p className="text-sm text-slate-500">
               From{" "}
@@ -123,7 +123,7 @@ export default async function PublicInvoicePage({ params }: PageParams) {
             </div>
             <div className="text-sm text-slate-600 space-y-1">
               <div className="flex justify-between gap-4">
-                <span className="text-slate-500">Invoice #</span>
+                <span className="text-slate-500">Bill #</span>
                 <span className="font-medium text-slate-900">
                   {invoice.invoice_number}
                 </span>
