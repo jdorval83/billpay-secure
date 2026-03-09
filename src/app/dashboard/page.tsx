@@ -157,7 +157,7 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error(data.error || "Failed to record payment");
       setMessage({
         type: "success",
-        text: data.billsMarkedPaid ? `Payment recorded. ${data.billsMarkedPaid} charge(s) marked paid.` : "Payment recorded.",
+        text: data.billsMarkedPaid ? `Payment recorded. ${data.billsMarkedPaid} bill(s) marked paid.` : "Payment recorded.",
       });
       setRecordPaymentOpen(false);
       setRecordPaymentForm({ amount: "", check_number: "", payer_name: "", paid_at: new Date().toISOString().slice(0, 10), notes: "", bill_ids: [], file: null });
@@ -224,7 +224,7 @@ export default function DashboardPage() {
 
         <div className="card p-6 mb-8">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-            <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Weekly charges vs payments</h2>
+            <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Weekly bills vs payments</h2>
             <div className="flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-2 text-sm">
                 <span className="text-slate-600">From</span>
@@ -254,8 +254,8 @@ export default function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="week" tick={{ fontSize: 11 }} tickFormatter={(v) => (v ? `${v.slice(5, 7)}/${v.slice(8, 10)}` : "")} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + (v >= 1000 ? (v / 1000) + "k" : String(v))} allowDecimals={false} domain={["auto", "auto"]} width={52} />
-                <Tooltip formatter={(v: number, n: string) => [typeof v === "number" ? "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2 }) : v, n === "chargesD" ? "Charges" : "Payments"]} contentStyle={{ fontSize: 13 }} labelFormatter={(_, items) => (items?.[0]?.payload?.label as string) || ""} />
-                <Line type="monotone" dataKey="chargesD" name="Charges" stroke="#475569" strokeWidth={2} dot={{ r: 4 }} />
+                <Tooltip formatter={(v: number, n: string) => [typeof v === "number" ? "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2 }) : v, n === "chargesD" ? "Bills" : "Payments"]} contentStyle={{ fontSize: 13 }} labelFormatter={(_, items) => (items?.[0]?.payload?.label as string) || ""} />
+                <Line type="monotone" dataKey="chargesD" name="Bills" stroke="#475569" strokeWidth={2} dot={{ r: 4 }} />
                 <Line type="monotone" dataKey="paymentsD" name="Payments" stroke="#059669" strokeWidth={2} dot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>

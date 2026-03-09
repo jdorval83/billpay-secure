@@ -25,11 +25,12 @@ const STATUS_LABELS: Record<string, string> = {
   finalized: "Billed",
   sent: "Billed",
   past_due: "Past due",
+  overdue: "Past due",
   paid: "Paid",
 };
 function StatusBadge({ bill }: { bill: Bill }) {
   const s = (bill.status || "ready").toLowerCase();
-  const displayStatus = s === "draft" || s === "finalized" || s === "sent" ? (s === "draft" ? "ready" : "billed") : s;
+  const displayStatus = s === "draft" ? "ready" : s === "finalized" || s === "sent" ? "billed" : s === "overdue" ? "past_due" : s;
   const styles: Record<string, string> = {
     ready: "bg-sky-50 text-sky-700 border-sky-200",
     billed: "bg-slate-100 text-slate-700 border-slate-200",
@@ -67,7 +68,7 @@ function BillsPageContent() {
   const [actioningId, setActioningId] = useState<string | null>(null);
 
   const outstandingCount = useMemo(() =>
-    bills.filter((b) => (b.balance_cents ?? 0) > 0 && ["billed", "past_due", "finalized", "sent"].includes((b.status || "").toLowerCase())).length,
+    bills.filter((b) => (b.balance_cents ?? 0) > 0 && ["billed", "past_due", "overdue", "finalized", "sent"].includes((b.status || "").toLowerCase())).length,
   [bills]);
 
   const filteredBills = useMemo(() => {
@@ -91,7 +92,7 @@ function BillsPageContent() {
     if (dateFrom) out = out.filter((b) => b.due_date >= dateFrom);
     if (dateTo) out = out.filter((b) => b.due_date <= dateTo);
     if (statusFilter) {
-      const normalized = (s: string) => (s === "draft" ? "ready" : s === "finalized" || s === "sent" ? "billed" : s);
+      const normalized = (s: string) => (s === "draft" ? "ready" : s === "finalized" || s === "sent" ? "billed" : s === "overdue" ? "past_due" : s);
       if (statusFilter === "past_due") {
         out = out.filter((b) => normalized((b.status || "").toLowerCase()) === "past_due");
       } else {
@@ -234,7 +235,7 @@ function BillsPageContent() {
     const ids = selectedBills.map((b) => b.id);
     const eligible = selectedBills.filter((b) => {
       const s = (b.status || "").toLowerCase();
-      const allowed = status === "billed" ? ["draft", "ready"] : ["billed", "past_due"];
+      const allowed = status === "billed" ? ["draft", "ready"] : ["billed", "past_due", "overdue"];
       return allowed.includes(s);
     });
     if (eligible.length === 0) {
@@ -504,7 +505,7 @@ function BillsPageContent() {
                     {(creatingInvoice || bulkActionLoading) ? "Sending…" : "SEND BILL"}
                   </button>
                 )}
-                {selectedBills.every((b) => ["billed", "past_due", "finalized", "sent"].includes((b.status || "").toLowerCase())) && (
+                {selectedBills.every((b) => ["billed", "past_due", "overdue", "finalized", "sent"].includes((b.status || "").toLowerCase())) && (
                   <button type="button" onClick={() => handleBulkStatus("paid")} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5">
                     {bulkActionLoading ? "Updating…" : "Mark as Paid"}
                   </button>
@@ -541,7 +542,7 @@ function BillsPageContent() {
               </thead>
               <tbody>
                 {filteredBills.length === 0 ? (
-                  <tr><td colSpan={7} className="p-6 text-center text-slate-500">No charges match your search.</td></tr>
+                  <tr><td colSpan={7} className="p-6 text-center text-slate-500">No bills match your search.</td></tr>
                 ) : (
                 paginatedBills.map((b) => (
                   <tr
@@ -566,14 +567,14 @@ function BillsPageContent() {
                         {["draft", "ready"].includes((b.status || "").toLowerCase()) && (
                           <button type="button" onClick={() => updateOneStatus(b, "billed")} disabled={actioningId === b.id} className="text-sm font-medium text-emerald-600 hover:text-emerald-800 px-2 py-1 rounded hover:bg-emerald-50 disabled:opacity-50">{actioningId === b.id ? "…" : "Send"}</button>
                         )}
-                        {["billed", "past_due", "finalized", "sent"].includes((b.status || "").toLowerCase()) && (
+                        {["billed", "past_due", "overdue", "finalized", "sent"].includes((b.status || "").toLowerCase()) && (
                           <>
                             <button
                               type="button"
                               onClick={() => updateOneStatus(b, "paid")}
                               disabled={actioningId === b.id}
                               className={`text-sm font-medium px-2 py-1 rounded disabled:opacity-50 ${
-                                (b.status || "").toLowerCase() === "past_due"
+                                ["past_due", "overdue"].includes((b.status || "").toLowerCase())
                                   ? "text-rose-600 hover:text-rose-800 hover:bg-rose-50"
                                   : "text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50"
                               }`}

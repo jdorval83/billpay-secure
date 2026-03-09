@@ -34,6 +34,7 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   draft: ["ready", "billed"],
   billed: ["paid", "past_due"],
   past_due: ["paid"],
+  overdue: ["paid"],
   finalized: ["billed", "paid", "past_due"],
   sent: ["billed", "paid", "past_due"],
   paid: [],
@@ -73,8 +74,8 @@ export async function PATCH(
   const effectiveBusinessId = (bill as { business_id: string }).business_id;
   const update: Record<string, unknown> = {};
 
-  // Field updates (amount, description, due_date) — draft, ready, or past_due (adjust)
-  const canEdit = ["draft", "ready", "past_due"].includes((bill.status || "").toLowerCase());
+  // Field updates (amount, description, due_date) — draft, ready, past_due, or overdue (adjust)
+  const canEdit = ["draft", "ready", "past_due", "overdue"].includes((bill.status || "").toLowerCase());
   if (canEdit) {
     if (typeof body.amount_cents === "number" && body.amount_cents > 0) {
       update.amount_cents = Math.round(body.amount_cents);

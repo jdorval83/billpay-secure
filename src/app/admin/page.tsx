@@ -167,11 +167,11 @@ export default function AdminPage() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-slate-900">{stats.bills}</p>
-                    <p className="text-sm text-slate-500">Charges</p>
+                    <p className="text-sm text-slate-500">Bills</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-slate-900">{stats.invoices}</p>
-                    <p className="text-sm text-slate-500">Invoices</p>
+                    <p className="text-sm text-slate-500">Sent bills</p>
                   </div>
                 </div>
               </section>

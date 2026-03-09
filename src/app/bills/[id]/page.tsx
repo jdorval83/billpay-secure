@@ -30,12 +30,13 @@ const STATUS_LABELS: Record<string, string> = {
   finalized: "Billed",
   sent: "Billed",
   past_due: "Past due",
+  overdue: "Past due",
   paid: "Paid",
 };
 
 function StatusBadge({ status }: { status: string }) {
   const s = (status || "ready").toLowerCase();
-  const displayStatus = s === "draft" ? "ready" : s === "finalized" || s === "sent" ? "billed" : s;
+  const displayStatus = s === "draft" ? "ready" : s === "finalized" || s === "sent" ? "billed" : s === "overdue" ? "past_due" : s;
   const styles: Record<string, string> = {
     ready: "bg-sky-50 text-sky-700 border-sky-200",
     billed: "bg-slate-100 text-slate-700 border-slate-200",
@@ -101,7 +102,7 @@ export default function BillDetailPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update");
       setBill(data.bill);
-      setMessage({ type: "success", text: "Charge updated." });
+      setMessage({ type: "success", text: "Bill updated." });
     } catch (e) {
       setMessage({
         type: "error",
@@ -112,10 +113,10 @@ export default function BillDetailPage() {
     }
   };
 
-  const canEdit = bill && ["draft", "ready", "past_due"].includes((bill.status || "").toLowerCase());
+  const canEdit = bill && ["draft", "ready", "past_due", "overdue"].includes((bill.status || "").toLowerCase());
   const canMarkSent = bill && ["draft", "ready"].includes((bill.status || "").toLowerCase());
-  const canMarkPaid = bill && ["billed", "past_due", "finalized", "sent"].includes((bill.status || "").toLowerCase());
-  const canResend = bill && ["billed", "past_due", "finalized", "sent"].includes((bill.status || "").toLowerCase());
+  const canMarkPaid = bill && ["billed", "past_due", "overdue", "finalized", "sent"].includes((bill.status || "").toLowerCase());
+  const canResend = bill && ["billed", "past_due", "overdue", "finalized", "sent"].includes((bill.status || "").toLowerCase());
 
   const handleResend = async () => {
     if (!bill) return;
@@ -197,9 +198,9 @@ export default function BillDetailPage() {
     return (
       <main className="page-container">
         <div className="content-max">
-          <p className="text-slate-600 mb-4">Charge not found.</p>
+          <p className="text-slate-600 mb-4">Bill not found.</p>
           <Link href="/bills" className="btn-secondary">
-            Back to charges
+            Back to bills
           </Link>
         </div>
       </main>
@@ -217,10 +218,10 @@ export default function BillDetailPage() {
               href="/bills"
               className="text-slate-500 hover:text-slate-700 text-sm font-medium"
             >
-              ← Back to charges
+              ← Back to bills
             </Link>
             <h1 className="text-2xl font-bold text-slate-900">
-              Charge details
+              Bill details
             </h1>
           </div>
         </div>
@@ -384,7 +385,7 @@ export default function BillDetailPage() {
                     onClick={() => updateStatus("paid")}
                     disabled={busy}
                     className={`w-full py-2.5 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 ${
-                      (bill.status || "").toLowerCase() === "past_due"
+                      ["past_due", "overdue"].includes((bill.status || "").toLowerCase())
                         ? "bg-rose-600 hover:bg-rose-700 text-white"
                         : "btn-primary"
                     }`}

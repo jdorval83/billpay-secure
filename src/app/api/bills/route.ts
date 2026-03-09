@@ -75,6 +75,7 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   draft: ["ready", "billed"],
   billed: ["paid", "past_due"],
   past_due: ["paid"],
+  overdue: ["paid"],
   finalized: ["billed", "paid", "past_due"],
   sent: ["billed", "paid", "past_due"],
   paid: [],
