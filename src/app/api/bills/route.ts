@@ -4,6 +4,15 @@ import { getBusinessIdForRequest } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   const businessId = await getBusinessIdForRequest(request);
+
+  let pastDueDays = 0;
+  try {
+    const { data: biz } = await supabaseAdmin.from("businesses").select("past_due_days").eq("id", businessId).maybeSingle();
+    pastDueDays = Math.max(0, Math.min(365, (biz as { past_due_days?: number } | null)?.past_due_days ?? 0));
+  } catch {
+    // past_due_days column may not exist
+  }
+
   const { data, error } = await supabaseAdmin
     .from("bills")
     .select("*, customers(name, email, phone)")
@@ -11,6 +20,22 @@ export async function GET(request: Request) {
     .order("due_date", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const bills = (data || []) as { id: string; status: string; due_date: string; business_id: string }[];
+  const today = new Date().toISOString().slice(0, 10);
+
+  for (const b of bills) {
+    const s = (b.status || "").toLowerCase();
+    if (s === "billed" || s === "finalized" || s === "sent") {
+      const due = new Date(b.due_date + "T00:00:00");
+      due.setDate(due.getDate() + pastDueDays);
+      const cutoff = due.toISOString().slice(0, 10);
+      if (today > cutoff) {
+        await supabaseAdmin.from("bills").update({ status: "past_due" }).eq("id", b.id).eq("business_id", b.business_id);
+        (b as { status: string }).status = "past_due";
+      }
+    }
+  }
+
   return NextResponse.json({ bills: data });
 }
 
@@ -46,14 +71,13 @@ export async function POST(request: Request) {
 }
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  ready: ["billed", "void"],
-  draft: ["ready", "billed", "void"],
-  finalized: ["billed", "paid", "written_off", "void"],
-  billed: ["paid", "written_off", "void"],
-  sent: ["billed", "paid", "written_off", "void"],
+  ready: ["billed"],
+  draft: ["ready", "billed"],
+  billed: ["paid", "past_due"],
+  past_due: ["paid"],
+  finalized: ["billed", "paid", "past_due"],
+  sent: ["billed", "paid", "past_due"],
   paid: [],
-  written_off: [],
-  void: [],
 };
 
 export async function PATCH(request: Request) {
@@ -62,7 +86,7 @@ export async function PATCH(request: Request) {
     const body = await request.json().catch(() => ({}));
     const ids: string[] = Array.isArray(body?.ids) ? body.ids : [];
     const newStatus = body?.status && String(body.status).toLowerCase();
-    if (!ids.length || !newStatus || !["ready", "billed", "sent", "paid", "written_off", "void"].includes(newStatus)) {
+    if (!ids.length || !newStatus || !["ready", "billed", "paid", "past_due"].includes(newStatus)) {
       return NextResponse.json(
         { error: "ids array and status (ready, billed, paid, written_off) required" },
         { status: 400 }
@@ -75,12 +99,13 @@ export async function PATCH(request: Request) {
       .eq("business_id", businessId)
       .in("id", ids);
 
-    if (fetchErr || !bills?.length) {
-      const { data: billsById } = await supabaseAdmin
+    if ((fetchErr || !bills?.length) && ids.length > 0) {
+      const { data: byIds } = await supabaseAdmin
         .from("bills")
         .select("id, status, first_sent_at, business_id")
         .in("id", ids);
-      if (billsById?.length) bills = billsById;
+      const matching = (byIds || []).filter((b: { business_id?: string }) => (b.business_id ?? "") === businessId);
+      if (matching.length) bills = matching;
     }
 
     if (!bills?.length) {
@@ -93,12 +118,6 @@ export async function PATCH(request: Request) {
       update.paid_at = nowIso;
       update.balance_cents = 0;
     }
-    if (newStatus === "written_off") {
-      update.written_off_at = nowIso;
-      update.balance_cents = 0;
-      if (body.writeoffReason) update.writeoff_reason = String(body.writeoffReason).slice(0, 500);
-    }
-
     let updated = 0;
     for (const bill of bills as { id: string; status: string; first_sent_at?: string | null }[]) {
       const current = (bill.status || "draft").toLowerCase();

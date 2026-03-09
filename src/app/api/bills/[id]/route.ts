@@ -10,14 +10,19 @@ export async function GET(
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "Bill ID required" }, { status: 400 });
 
-  const { data: bill, error } = await supabaseAdmin
+  let { data: bill, error } = await supabaseAdmin
     .from("bills")
     .select("*, customers(name, email, phone)")
     .eq("business_id", businessId)
     .eq("id", id)
-    .single();
+    .maybeSingle();
 
-  if (error || !bill) {
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!bill) {
+    const { data: byId } = await supabaseAdmin.from("bills").select("id, business_id").eq("id", id).maybeSingle();
+    if (byId && (byId as { business_id: string }).business_id !== businessId) {
+      return NextResponse.json({ error: "This bill belongs to a different account" }, { status: 403 });
+    }
     return NextResponse.json({ error: "Bill not found" }, { status: 404 });
   }
 
@@ -25,14 +30,13 @@ export async function GET(
 }
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  ready: ["billed", "void"],
-  draft: ["ready", "billed", "void"],
-  finalized: ["billed", "paid", "written_off", "void"],
-  billed: ["paid", "written_off", "void"],
-  sent: ["billed", "paid", "written_off", "void"],
+  ready: ["billed"],
+  draft: ["ready", "billed"],
+  billed: ["paid", "past_due"],
+  past_due: ["paid"],
+  finalized: ["billed", "paid", "past_due"],
+  sent: ["billed", "paid", "past_due"],
   paid: [],
-  written_off: [],
-  void: [],
 };
 
 export async function PATCH(
@@ -55,21 +59,14 @@ export async function PATCH(
     .select("id, status, business_id, first_sent_at")
     .eq("business_id", businessId)
     .eq("id", id)
-    .single();
+    .maybeSingle();
 
-  if (fetchError || !bill) {
-    const { data: billByKey } = await supabaseAdmin
-      .from("bills")
-      .select("id, status, business_id, first_sent_at")
-      .eq("id", id)
-      .single();
-    if (billByKey) {
-      bill = billByKey as typeof bill;
-      (bill as { business_id: string }).business_id = bill.business_id;
-    }
-  }
-
+  if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
   if (!bill) {
+    const { data: byId } = await supabaseAdmin.from("bills").select("id, business_id").eq("id", id).maybeSingle();
+    if (byId && (byId as { business_id: string }).business_id !== businessId) {
+      return NextResponse.json({ error: "This bill belongs to a different account" }, { status: 403 });
+    }
     return NextResponse.json({ error: "Bill not found" }, { status: 404 });
   }
 
@@ -89,7 +86,7 @@ export async function PATCH(
 
   // Status update
   const newStatus = body.status && String(body.status).toLowerCase();
-  if (newStatus && ["ready", "draft", "billed", "sent", "void", "paid", "written_off"].includes(newStatus)) {
+  if (newStatus && ["ready", "billed", "paid", "past_due"].includes(newStatus)) {
     const current = (bill.status || "draft").toLowerCase();
     const allowed = ALLOWED_TRANSITIONS[current];
     if (!allowed?.includes(newStatus)) {
@@ -105,11 +102,6 @@ export async function PATCH(
     if (newStatus === "paid") {
       update.paid_at = nowIso;
       update.balance_cents = 0;
-    }
-    if (newStatus === "written_off") {
-      update.written_off_at = nowIso;
-      update.balance_cents = 0;
-      if (body.writeoffReason != null) update.writeoff_reason = String(body.writeoffReason).slice(0, 500);
     }
   }
 

@@ -38,14 +38,15 @@ export async function PATCH(request: Request) {
       logo_url?: string;
       invoice_footer?: string;
       support_email?: string;
-      past_due_days?: number;
+      past_due_days?: number | string;
     };
 
     const update: Record<string, unknown> = {};
     if (typeof logo_url === "string") update.logo_url = logo_url;
     if (typeof invoice_footer === "string") update.invoice_footer = invoice_footer;
     if (typeof support_email === "string") update.support_email = support_email;
-    if (typeof past_due_days === "number" && past_due_days >= 0) update.past_due_days = Math.min(365, Math.round(past_due_days));
+    const pdd = typeof past_due_days === "number" ? past_due_days : parseInt(String(past_due_days ?? ""), 10);
+    if (!isNaN(pdd) && pdd >= 0) update.past_due_days = Math.min(365, Math.round(pdd));
 
     if (Object.keys(update).length === 0) {
       return NextResponse.json({ error: "No updatable fields provided" }, { status: 400 });
@@ -73,7 +74,7 @@ export async function PATCH(request: Request) {
           .select(selectCols)
           .single();
         if (e2 || !d2) return NextResponse.json({ error: e2?.message || "Failed to update" }, { status: 500 });
-        return NextResponse.json({ business: { ...d2, past_due_days: past_due_days ?? 0 } });
+        return NextResponse.json({ business: { ...d2, past_due_days: !isNaN(pdd) ? Math.min(365, Math.max(0, Math.round(pdd))) : 0 } });
       }
       return NextResponse.json({ error: error.message || "Failed to update business" }, { status: 500 });
     }

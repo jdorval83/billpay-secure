@@ -64,22 +64,46 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSaveBilling = async () => {
     if (!business) return;
     setSaving(true);
     setMessage(null);
     try {
       const res = await fetch("/api/business", {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ invoice_footer: footer, past_due_days: pastDueDays }),
+        body: JSON.stringify({ past_due_days: pastDueDays }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to save settings");
+      if (!res.ok) throw new Error(json.error || "Failed to save");
       setBusiness(json.business);
-      setMessage("Settings saved.");
+      setPastDueDays(typeof json.business?.past_due_days === "number" ? json.business.past_due_days : pastDueDays);
+      setMessage("Billing settings saved.");
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Failed to save settings");
+      setMessage(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveFooter = async () => {
+    if (!business) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/business", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoice_footer: footer }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to save");
+      setBusiness(json.business);
+      setMessage("Invoice footer saved.");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -167,7 +191,7 @@ export default function SettingsPage() {
             <p className="mt-1 text-xs text-slate-500">Number of days after the due date before a bill is considered past due. 0 = due date is the cutoff.</p>
           </div>
           <div className="flex justify-end">
-            <button type="button" onClick={handleSave} disabled={saving} className="btn-primary">
+            <button type="button" onClick={handleSaveBilling} disabled={saving} className="btn-primary">
               {saving ? "Saving…" : "Save"}
             </button>
           </div>
@@ -183,7 +207,7 @@ export default function SettingsPage() {
           <div className="flex justify-end">
             <button
               type="button"
-              onClick={handleSave}
+              onClick={handleSaveFooter}
               disabled={saving}
               className="btn-primary"
             >

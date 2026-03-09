@@ -24,34 +24,30 @@ type Bill = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  draft: "Draft",
   ready: "Ready",
-  finalized: "Billed",
+  draft: "Ready",
   billed: "Billed",
+  finalized: "Billed",
   sent: "Billed",
+  past_due: "Past due",
   paid: "Paid",
-  written_off: "Written off",
-  void: "Void",
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const s = (status || "draft").toLowerCase();
+  const s = (status || "ready").toLowerCase();
+  const displayStatus = s === "draft" ? "ready" : s === "finalized" || s === "sent" ? "billed" : s;
   const styles: Record<string, string> = {
-    draft: "bg-amber-50 text-amber-700 border-amber-200",
     ready: "bg-sky-50 text-sky-700 border-sky-200",
-    finalized: "bg-slate-100 text-slate-700 border-slate-200",
     billed: "bg-slate-100 text-slate-700 border-slate-200",
-    sent: "bg-slate-100 text-slate-700 border-slate-200",
+    past_due: "bg-rose-50 text-rose-700 border-rose-200",
     paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    written_off: "bg-rose-50 text-rose-700 border-rose-200",
-    void: "bg-slate-100 text-slate-500 border-slate-200",
   };
-  const style = styles[s] || styles.draft;
+  const style = styles[displayStatus] || styles.ready;
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${style}`}
     >
-      {STATUS_LABELS[s] || s}
+      {STATUS_LABELS[displayStatus] || displayStatus}
     </span>
   );
 }
@@ -117,9 +113,8 @@ export default function BillDetailPage() {
   };
 
   const canEdit = bill && ["draft", "ready"].includes((bill.status || "").toLowerCase());
-  const canMarkSent = bill && ["draft", "ready", "finalized"].includes((bill.status || "").toLowerCase());
-  const canMarkPaid = bill && ["finalized", "sent", "billed"].includes((bill.status || "").toLowerCase());
-  const canWriteOff = bill && ["finalized", "sent", "billed"].includes((bill.status || "").toLowerCase());
+  const canMarkSent = bill && ["draft", "ready"].includes((bill.status || "").toLowerCase());
+  const canMarkPaid = bill && ["billed", "past_due", "finalized", "sent"].includes((bill.status || "").toLowerCase());
 
   const handleSaveEdit = async () => {
     if (!bill) return;
@@ -376,20 +371,7 @@ export default function BillDetailPage() {
                     {busy ? "Updating…" : "Mark as Paid"}
                   </button>
                 )}
-                {canWriteOff && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const reason = window.prompt("Reason for write-off (optional):", "Bad debt");
-                      updateStatus("written_off", { writeoffReason: reason ?? null });
-                    }}
-                    disabled={busy}
-                    className="btn-secondary w-full text-rose-700 border-rose-200 hover:bg-rose-50"
-                  >
-                    {busy ? "Updating…" : "Write off"}
-                  </button>
-                )}
-                {!canMarkSent && !canMarkPaid && !canWriteOff && (
+                {!canMarkSent && !canMarkPaid && (
                   <p className="text-sm text-slate-500">No actions available for this status.</p>
                 )}
               </div>
