@@ -21,14 +21,20 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setLoading(true);
-    fetch("/api/business")
-      .then((r) => r.json())
-      .then((data) => {
+    fetch("/api/business", { credentials: "include" })
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
         if (data.business) {
           setBusiness(data.business);
           setFooter(data.business.invoice_footer || "");
           setPastDueDays(typeof data.business.past_due_days === "number" ? data.business.past_due_days : 0);
+        } else {
+          throw new Error(data.error || "No business data");
         }
+      })
+      .catch((err) => {
+        setMessage(err instanceof Error ? err.message : "Failed to load");
       })
       .finally(() => setLoading(false));
   }, []);
@@ -99,7 +105,7 @@ export default function SettingsPage() {
       <main className="page-container">
         <div className="content-max">
           <h1 className="text-2xl font-bold text-slate-900 mb-4">Settings</h1>
-          <p className="text-sm text-red-600">Unable to load business settings.</p>
+          <p className="text-sm text-red-600">{message || "Unable to load business settings."}</p>
         </div>
       </main>
     );

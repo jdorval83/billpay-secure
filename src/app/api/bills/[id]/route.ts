@@ -27,6 +27,7 @@ export async function GET(
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   ready: ["billed", "void"],
   draft: ["ready", "billed", "void"],
+  finalized: ["billed", "paid", "written_off", "void"],
   billed: ["paid", "written_off", "void"],
   sent: ["billed", "paid", "written_off", "void"],
   paid: [],

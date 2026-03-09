@@ -21,6 +21,7 @@ type Bill = {
 const STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
   ready: "Ready",
+  finalized: "Billed",
   billed: "Billed",
   sent: "Billed",
   paid: "Paid",
@@ -30,11 +31,12 @@ const STATUS_LABELS: Record<string, string> = {
 function StatusBadge({ bill }: { bill: Bill }) {
   const s = (bill.status || "draft").toLowerCase();
   const today = new Date().toISOString().slice(0, 10);
-  const isOverdue = (s === "sent" || s === "billed") && bill.balance_cents > 0 && bill.due_date < today;
+  const isOverdue = (s === "sent" || s === "billed" || s === "finalized") && bill.balance_cents > 0 && bill.due_date < today;
   const displayStatus = isOverdue ? "overdue" : s;
   const styles: Record<string, string> = {
     draft: "bg-amber-50 text-amber-700 border-amber-200",
     ready: "bg-sky-50 text-sky-700 border-sky-200",
+    finalized: "bg-slate-100 text-slate-700 border-slate-200",
     billed: "bg-slate-100 text-slate-700 border-slate-200",
     sent: "bg-indigo-50 text-indigo-700 border-indigo-200",
     paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -73,7 +75,7 @@ function BillsPageContent() {
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   const outstandingCount = useMemo(() =>
-    bills.filter((b) => (b.balance_cents ?? 0) > 0 && ["billed", "sent"].includes((b.status || "").toLowerCase())).length,
+    bills.filter((b) => (b.balance_cents ?? 0) > 0 && ["finalized", "billed", "sent"].includes((b.status || "").toLowerCase())).length,
   [bills]);
 
   const filteredBills = useMemo(() => {
@@ -101,7 +103,7 @@ function BillsPageContent() {
       if (statusFilter === "overdue") {
         out = out.filter((b) => {
           const s = (b.status || "").toLowerCase();
-          return (s === "sent" || s === "billed") && b.balance_cents > 0 && b.due_date < today;
+          return (s === "sent" || s === "billed" || s === "finalized") && b.balance_cents > 0 && b.due_date < today;
         });
       } else {
         out = out.filter((b) => (b.status || "").toLowerCase() === statusFilter);
@@ -150,7 +152,7 @@ function BillsPageContent() {
   const format = (c: number) => "$" + (c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
   const canSelectForInvoice = (b: Bill) => {
     const s = (b.status || "").toLowerCase();
-    return (s === "draft" || s === "ready") && b.balance_cents > 0;
+    return (s === "draft" || s === "ready" || s === "finalized") && b.balance_cents > 0;
   };
 
   const toggleSelect = (id: string) => {
@@ -162,7 +164,7 @@ function BillsPageContent() {
     });
   };
 
-  const selectableOnPage = paginatedBills.filter((b) => canSelectForInvoice(b) || ["sent", "billed"].includes((b.status || "").toLowerCase()));
+  const selectableOnPage = paginatedBills.filter((b) => canSelectForInvoice(b) || ["finalized", "sent", "billed"].includes((b.status || "").toLowerCase()));
   const allSelectedOnPage = selectableOnPage.length > 0 && selectableOnPage.every((b) => selectedIds.has(b.id));
   const toggleSelectAll = () => {
     if (allSelectedOnPage) {
@@ -228,7 +230,7 @@ function BillsPageContent() {
     const ids = selectedBills.map((b) => b.id);
     const eligible = selectedBills.filter((b) => {
       const s = (b.status || "").toLowerCase();
-      const allowed = status === "billed" ? ["draft", "ready"] : ["sent", "billed"];
+      const allowed = status === "billed" ? ["draft", "ready", "finalized"] : ["finalized", "sent", "billed"];
       return allowed.includes(s);
     });
     if (eligible.length === 0) {
@@ -463,6 +465,7 @@ function BillsPageContent() {
                 <option value="">All statuses</option>
                 <option value="draft">Draft</option>
                 <option value="ready">Ready</option>
+                <option value="finalized">Billed</option>
                 <option value="billed">Billed</option>
                 <option value="paid">Paid</option>
                 <option value="overdue">Overdue</option>
@@ -499,12 +502,12 @@ function BillsPageContent() {
             {selectedBills.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
                 <span className="text-sm font-medium text-slate-700">{selectedBills.length} selected</span>
-                {selectedBills.some((b) => ["ready", "draft"].includes((b.status || "").toLowerCase())) && (
+                {selectedBills.some((b) => ["ready", "draft", "finalized"].includes((b.status || "").toLowerCase())) && (
                   <button type="button" onClick={() => handleBulkStatus("billed")} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5">
                     {bulkActionLoading ? "Updating…" : "Mark sent all"}
                   </button>
                 )}
-                {selectedBills.every((b) => ["sent", "billed"].includes((b.status || "").toLowerCase())) && (
+                {selectedBills.every((b) => ["finalized", "sent", "billed"].includes((b.status || "").toLowerCase())) && (
                   <>
                     <button type="button" onClick={() => handleBulkStatus("paid")} disabled={bulkActionLoading} className="btn-secondary text-sm py-1.5">
                       {bulkActionLoading ? "Updating…" : "Mark paid all"}
@@ -557,7 +560,7 @@ function BillsPageContent() {
                     }}
                   >
                     <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
-                      {(canSelectForInvoice(b) || ["sent", "billed"].includes((b.status || "").toLowerCase())) ? (
+                      {(canSelectForInvoice(b) || ["finalized", "sent", "billed"].includes((b.status || "").toLowerCase())) ? (
                         <input type="checkbox" checked={selectedIds.has(b.id)} onChange={() => toggleSelect(b.id)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                       ) : (
                         <span className="text-slate-300">—</span>
@@ -572,7 +575,7 @@ function BillsPageContent() {
                       {(() => {
                         const s = (b.status || "draft").toLowerCase();
                         const isBusy = statusChangingId === b.id;
-                        if (s === "draft" || s === "ready") {
+                        if (s === "draft" || s === "ready" || s === "finalized") {
                           return (
                             <button
                               type="button"

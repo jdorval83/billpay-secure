@@ -26,6 +26,7 @@ type Bill = {
 const STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
   ready: "Ready",
+  finalized: "Billed",
   billed: "Billed",
   sent: "Billed",
   paid: "Paid",
@@ -38,6 +39,7 @@ function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     draft: "bg-amber-50 text-amber-700 border-amber-200",
     ready: "bg-sky-50 text-sky-700 border-sky-200",
+    finalized: "bg-slate-100 text-slate-700 border-slate-200",
     billed: "bg-slate-100 text-slate-700 border-slate-200",
     sent: "bg-slate-100 text-slate-700 border-slate-200",
     paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -105,7 +107,7 @@ export default function BillDetailPage() {
     }
   };
 
-  const canMarkSent = bill && ["draft", "ready"].includes((bill.status || "").toLowerCase());
+  const canMarkSent = bill && ["draft", "ready", "finalized"].includes((bill.status || "").toLowerCase());
   const canMarkPaid = bill && ["sent", "billed"].includes((bill.status || "").toLowerCase());
   const canWriteOff = bill && ["sent", "billed"].includes((bill.status || "").toLowerCase());
 

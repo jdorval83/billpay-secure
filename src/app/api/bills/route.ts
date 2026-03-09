@@ -48,6 +48,7 @@ export async function POST(request: Request) {
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   ready: ["billed", "void"],
   draft: ["ready", "billed", "void"],
+  finalized: ["billed", "paid", "written_off", "void"],
   billed: ["paid", "written_off", "void"],
   sent: ["billed", "paid", "written_off", "void"],
   paid: [],
@@ -61,7 +62,7 @@ export async function PATCH(request: Request) {
     const body = await request.json().catch(() => ({}));
     const ids: string[] = Array.isArray(body?.ids) ? body.ids : [];
     const newStatus = body?.status && String(body.status).toLowerCase();
-    if (!ids.length || !newStatus || !["ready", "billed", "sent", "paid", "written_off"].includes(newStatus)) {
+    if (!ids.length || !newStatus || !["ready", "billed", "sent", "paid", "written_off", "void"].includes(newStatus)) {
       return NextResponse.json(
         { error: "ids array and status (ready, billed, paid, written_off) required" },
         { status: 400 }
