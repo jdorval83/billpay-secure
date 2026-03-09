@@ -146,7 +146,10 @@ export async function POST(request: Request) {
         recipient: null,
         status: "sent",
       }));
-      await supabaseAdmin.from("bill_send_events").insert(sendEventRows);
+      const { error: sendEventError } = await supabaseAdmin.from("bill_send_events").insert(sendEventRows);
+      if (sendEventError) {
+        console.error("bill_send_events insert failed:", sendEventError);
+      }
     }
 
     const lineItemRows = baseLineItems.map((item: { description: string; quantity?: number; unitPriceCents?: number; amountCents: number; sortOrder?: number; sourceType?: string; sourceId?: string }, index: number) => ({
@@ -198,7 +201,8 @@ export async function POST(request: Request) {
           recipient: custPhone,
           status: "sent",
         }));
-        await supabaseAdmin.from("bill_send_events").insert(smsEventRows);
+        const { error: smsEventError } = await supabaseAdmin.from("bill_send_events").insert(smsEventRows);
+        if (smsEventError) console.error("bill_send_events sms insert failed:", smsEventError);
         await supabaseAdmin.from("invoices").update({ status: "sent" }).eq("id", invoice.id);
       } catch {
         // Don't fail the request if SMS fails; bill was created successfully

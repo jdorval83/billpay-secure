@@ -39,7 +39,34 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ bills: data });
+  const billsList = data || [];
+  const billIds = billsList.map((b: { id: string }) => b.id);
+  const { data: links } = await supabaseAdmin
+    .from("invoice_bills")
+    .select("bill_id, invoice_id")
+    .in("bill_id", billIds);
+  const invoiceIds = [...new Set((links || []).map((l: { invoice_id: string }) => l.invoice_id))];
+  const { data: invoices } = invoiceIds.length > 0
+    ? await supabaseAdmin
+        .from("invoices")
+        .select("id, public_token, status")
+        .in("id", invoiceIds)
+        .eq("business_id", businessId)
+    : { data: [] };
+  const invMap = new Map((invoices || []).map((i: { id: string; public_token?: string; status?: string }) => [i.id, i]));
+  const pdfByBill = new Map<string, string>();
+  for (const l of links || []) {
+    const inv = invMap.get((l as { invoice_id: string }).invoice_id);
+    if (inv?.public_token && !["paid", "void"].includes(inv.status || "")) {
+      pdfByBill.set((l as { bill_id: string }).bill_id, inv.public_token);
+    }
+  }
+  const billsWithPdf = billsList.map((b: { id: string }) => ({
+    ...b,
+    invoicePdfToken: pdfByBill.get(b.id) ?? null,
+  }));
+
+  return NextResponse.json({ bills: billsWithPdf });
 }
 
 export async function POST(request: Request) {

@@ -60,6 +60,7 @@ export default function BillDetailPage() {
   const id = params?.id as string | undefined;
   const [bill, setBill] = useState<Bill | null>(null);
   const [sendEvents, setSendEvents] = useState<SendEvent[]>([]);
+  const [invoicePdf, setInvoicePdf] = useState<{ publicToken: string; invoiceNumber?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -76,6 +77,7 @@ export default function BillDetailPage() {
         if (d.bill) {
           setBill(d.bill);
           setSendEvents(d.sendEvents || []);
+          setInvoicePdf(d.invoicePdf || null);
           setEditForm({
             amount: ((d.bill.amount_cents || 0) / 100).toFixed(2),
             description: d.bill.description || "",
@@ -157,6 +159,7 @@ export default function BillDetailPage() {
         if (d.bill) {
           setBill(d.bill);
           setSendEvents(d.sendEvents || []);
+          setInvoicePdf(d.invoicePdf || null);
         }
       });
   };
@@ -329,6 +332,21 @@ export default function BillDetailPage() {
                 <dd>
                   <StatusBadge status={bill.status} />
                 </dd>
+                {invoicePdf && (
+                  <>
+                    <dt className="text-slate-500">PDF</dt>
+                    <dd>
+                      <a
+                        href={`/api/public/invoices/${invoicePdf.publicToken}/pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-600 hover:text-emerald-800 font-medium underline"
+                      >
+                        View / Download PDF
+                      </a>
+                    </dd>
+                  </>
+                )}
                 <dt className="text-slate-500">Created</dt>
                 <dd className="font-medium text-slate-900">{formatDate(bill.created_at)}</dd>
                 {bill.paid_at && (
@@ -439,7 +457,17 @@ export default function BillDetailPage() {
                     {busy ? "Sending…" : "Resend payment link"}
                   </button>
                 )}
-                {!canMarkSent && !canMarkPaid && !canResend && (
+                {invoicePdf && (
+                  <a
+                    href={`/api/public/invoices/${invoicePdf.publicToken}/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-secondary w-full text-center py-2.5"
+                  >
+                    View / Download PDF
+                  </a>
+                )}
+                {!canMarkSent && !canMarkPaid && !canResend && !invoicePdf && (
                   <p className="text-sm text-slate-500">No actions available for this status.</p>
                 )}
               </div>
@@ -467,8 +495,12 @@ export default function BillDetailPage() {
                     ))}
                   </ul>
                 </>
+              ) : (bill?.sent_at || bill?.first_sent_at) ? (
+                <p className="text-sm text-slate-600">
+                  Sent: {formatDateTime(bill.first_sent_at ?? bill.sent_at)}
+                </p>
               ) : (
-                <p className="text-sm text-slate-500">No send history yet.</p>
+                <p className="text-sm text-slate-500">No send history yet. Send the bill to record history.</p>
               )}
             </div>
           </div>

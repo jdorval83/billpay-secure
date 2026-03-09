@@ -16,6 +16,7 @@ type Bill = {
   status: string;
   recurring_schedule?: string | null;
   customers?: { name?: string } | null;
+  invoicePdfToken?: string | null;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -566,6 +567,17 @@ function BillsPageContent() {
                         <button type="button" onClick={() => router.push(`/bills/${b.id}`)} className="text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100">View</button>
                         {["draft", "ready"].includes((b.status || "").toLowerCase()) && (
                           <button type="button" onClick={() => updateOneStatus(b, "billed")} disabled={actioningId === b.id} className="text-sm font-medium text-emerald-600 hover:text-emerald-800 px-2 py-1 rounded hover:bg-emerald-50 disabled:opacity-50">{actioningId === b.id ? "…" : "Send"}</button>
+                        )}
+                        {b.invoicePdfToken && (
+                          <a
+                            href={`/api/public/invoices/${b.invoicePdfToken}/pdf`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100"
+                          >
+                            PDF
+                          </a>
                         )}
                         {["billed", "past_due", "overdue", "finalized", "sent"].includes((b.status || "").toLowerCase()) && (
                           <>

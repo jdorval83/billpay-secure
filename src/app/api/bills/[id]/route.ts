@@ -26,13 +26,40 @@ export async function GET(
     return NextResponse.json({ error: "Bill not found" }, { status: 404 });
   }
 
-  const { data: sendEvents } = await supabaseAdmin
-    .from("bill_send_events")
-    .select("id, sent_at, channel, recipient, status, error_message")
-    .eq("bill_id", id)
-    .order("sent_at", { ascending: false });
+  const [{ data: sendEvents }, { data: links }] = await Promise.all([
+    supabaseAdmin
+      .from("bill_send_events")
+      .select("id, sent_at, channel, recipient, status, error_message")
+      .eq("bill_id", id)
+      .order("sent_at", { ascending: false }),
+    supabaseAdmin
+      .from("invoice_bills")
+      .select("invoice_id")
+      .eq("bill_id", id)
+      .limit(1),
+  ]);
 
-  return NextResponse.json({ bill, sendEvents: sendEvents || [] });
+  let invoicePdf: { publicToken: string; invoiceNumber?: string } | null = null;
+  const firstLink = Array.isArray(links) && links.length > 0 ? links[0] : null;
+  const invoiceId = (firstLink as { invoice_id?: string } | null)?.invoice_id;
+  if (invoiceId) {
+    const { data: inv } = await supabaseAdmin
+      .from("invoices")
+      .select("public_token, invoice_number, status")
+      .eq("id", invoiceId)
+      .eq("business_id", businessId)
+      .single();
+    const invData = inv as { public_token?: string; invoice_number?: string; status?: string } | null;
+    if (invData?.public_token && !["paid", "void"].includes(invData.status || "")) {
+      invoicePdf = { publicToken: invData.public_token, invoiceNumber: invData.invoice_number ?? undefined };
+    }
+  }
+
+  return NextResponse.json({
+    bill,
+    sendEvents: sendEvents || [],
+    invoicePdf,
+  });
 }
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
