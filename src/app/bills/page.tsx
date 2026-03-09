@@ -494,9 +494,10 @@ function BillsPageContent() {
                 {selectedBills.some((b) => ["ready", "draft"].includes((b.status || "").toLowerCase())) && (
                   <button
                     type="button"
-                    onClick={canCreateInvoice ? handleCreateInvoice : () => handleBulkStatus("billed")}
-                    disabled={creatingInvoice || bulkActionLoading}
+                    onClick={handleCreateInvoice}
+                    disabled={!canCreateInvoice || creatingInvoice || bulkActionLoading}
                     className="btn-primary text-sm py-1.5"
+                    title={!canCreateInvoice ? "Select bills from one customer to send" : undefined}
                   >
                     {(creatingInvoice || bulkActionLoading) ? "Sending…" : "SEND BILL"}
                   </button>
@@ -556,7 +557,35 @@ function BillsPageContent() {
                       <div className="flex flex-wrap justify-end gap-1">
                         <button type="button" onClick={() => router.push(`/bills/${b.id}`)} className="text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100">View</button>
                         {["draft", "ready"].includes((b.status || "").toLowerCase()) && (
-                          <button type="button" onClick={() => updateOneStatus(b, "billed")} disabled={actioningId === b.id} className="text-sm font-medium text-emerald-600 hover:text-emerald-800 px-2 py-1 rounded hover:bg-emerald-50 disabled:opacity-50">{actioningId === b.id ? "…" : "Send"}</button>
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              setActioningId(b.id);
+                              setMessage(null);
+                              try {
+                                const res = await fetch("/api/invoices", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ customerId: b.customer_id, billIds: [b.id] }),
+                                  credentials: "include",
+                                });
+                                const data = await res.json();
+                                if (!res.ok) throw new Error(data.error || "Failed to send");
+                                setMessage({ type: "success", text: "Bill sent." });
+                                fetchBills();
+                                router.push("/invoices");
+                              } catch (err) {
+                                setMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to send" });
+                              } finally {
+                                setActioningId(null);
+                              }
+                            }}
+                            disabled={actioningId === b.id}
+                            className="text-sm font-medium text-emerald-600 hover:text-emerald-800 px-2 py-1 rounded hover:bg-emerald-50 disabled:opacity-50"
+                          >
+                            {actioningId === b.id ? "…" : "Send"}
+                          </button>
                         )}
                         {b.invoicePdfToken && (
                           <a

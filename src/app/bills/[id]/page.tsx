@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 type Bill = {
   id: string;
@@ -57,6 +57,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function BillDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string | undefined;
   const [bill, setBill] = useState<Bill | null>(null);
   const [sendEvents, setSendEvents] = useState<SendEvent[]>([]);
@@ -134,8 +135,9 @@ export default function BillDetailPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send bill");
-      setMessage({ type: "success", text: "Bill sent. Invoice created and payment link sent via text (if customer has SMS)." });
+      setMessage({ type: "success", text: "Bill sent." });
       refetchBill();
+      router.push("/invoices");
     } catch (e) {
       setMessage({
         type: "error",
