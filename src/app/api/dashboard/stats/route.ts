@@ -33,25 +33,32 @@ export async function GET(request: Request) {
   const totalPaymentsAll = totalPayments + totalRecordedPayments;
 
   const now = new Date();
-  const months: { month: string; charges: number; payments: number }[] = [];
+  const weeks: { week: string; label: string; charges: number; payments: number }[] = [];
   for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
-    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59).toISOString();
-    const chargesThisMonth = billList.filter(
+    const weekEnd = new Date(now);
+    weekEnd.setDate(weekEnd.getDate() - i * 7);
+    const weekStart = new Date(weekEnd);
+    weekStart.setDate(weekStart.getDate() - 6);
+    weekStart.setHours(0, 0, 0, 0);
+    weekEnd.setHours(23, 59, 59, 999);
+    const start = weekStart.toISOString();
+    const end = weekEnd.toISOString();
+    const startYMD = start.slice(0, 10);
+    const endYMD = end.slice(0, 10);
+    const chargesThisWeek = billList.filter(
       (b) => b.created_at >= start && b.created_at <= end
     ).reduce((s, b) => s + (b.amount_cents || 0), 0);
-    const paidThisMonth = billList.filter(
+    const paidThisWeek = billList.filter(
       (b) => b.paid_at && b.paid_at >= start && b.paid_at <= end
     ).reduce((s, b) => s + (b.amount_cents || 0), 0);
-    const recordedThisMonth = records.filter(
-      (r) => r.paid_at >= start.slice(0, 10) && r.paid_at <= end.slice(0, 10)
+    const recordedThisWeek = records.filter(
+      (r) => r.paid_at >= startYMD && r.paid_at <= endYMD
     ).reduce((s, r) => s + (r.amount_cents || 0), 0);
-    months.push({
-      month: monthKey,
-      charges: chargesThisMonth,
-      payments: paidThisMonth + recordedThisMonth,
+    weeks.push({
+      week: startYMD,
+      label: `${startYMD} – ${endYMD}`,
+      charges: chargesThisWeek,
+      payments: paidThisWeek + recordedThisWeek,
     });
   }
 
@@ -80,7 +87,7 @@ export async function GET(request: Request) {
     totalCharges,
     totalPayments: totalPaymentsAll,
     totalOutstanding,
-    byMonth: months,
+    byWeek: weeks,
     aging,
   });
 }

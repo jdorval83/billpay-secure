@@ -1,3 +1,4 @@
+import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "./supabase";
 
 const DEFAULT_BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
@@ -18,11 +19,42 @@ export function getTenantSlugFromHost(host: string | null): string {
 }
 
 export async function getBusinessIdForRequest(req: Request): Promise<string> {
+  const override = process.env.PRIMARY_BUSINESS_ID;
+  if (override && typeof override === "string" && override.trim().length > 0) {
+    return override.trim();
+  }
+
+  // Use logged-in user's business when available (fixes no-subdomain / single-tenant)
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const meta = user?.user_metadata;
+    const bizId = meta?.business_id;
+    if (bizId && typeof bizId === "string") return bizId.trim();
+    const subdomain = meta?.business_subdomain;
+    if (subdomain && typeof subdomain === "string") {
+      const { data } = await supabaseAdmin
+        .from("businesses")
+        .select("id")
+        .eq("subdomain", String(subdomain).toLowerCase())
+        .maybeSingle();
+      if (data) return data.id as string;
+    }
+  } catch {
+    // fall through to host-based resolution
+  }
+
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
   return getBusinessIdFromHost(host);
 }
 
 export async function getBusinessIdFromHost(host: string | null): Promise<string> {
+  const override = process.env.PRIMARY_BUSINESS_ID;
+  if (override && typeof override === "string" && override.trim().length > 0) {
+    return override.trim();
+  }
   const slug = getTenantSlugFromHost(host);
 
   const { data: bySubdomain, error } = await supabaseAdmin

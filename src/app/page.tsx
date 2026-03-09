@@ -77,7 +77,7 @@ export default function Home() {
         </span>
         </div>
         <Link
-          href="/signup"
+          href={process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/signup` : "/signup"}
           className="rounded-lg px-4 py-2 text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors"
         >
           Sign up

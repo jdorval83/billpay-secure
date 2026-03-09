@@ -48,6 +48,14 @@ export async function GET(
     );
   }
 
+  const totalCents = Number(invoice.total_cents);
+  if (!Number.isFinite(totalCents) || totalCents <= 0) {
+    return NextResponse.json(
+      { error: "Invoice has invalid total" },
+      { status: 400 }
+    );
+  }
+
   const baseUrl = getBaseUrl(_request);
   const successUrl = `${baseUrl}/public/invoices/${token}?paid=1`;
   const cancelUrl = `${baseUrl}/public/invoices/${token}?canceled=1`;
@@ -64,7 +72,7 @@ export async function GET(
           product_data: {
             name: invoice.invoice_number || "Invoice",
           },
-          unit_amount: invoice.total_cents,
+          unit_amount: totalCents,
         },
         quantity: 1,
       },

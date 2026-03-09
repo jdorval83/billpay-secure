@@ -28,7 +28,7 @@ type DashboardStats = {
   totalCharges: number;
   totalPayments: number;
   totalOutstanding: number;
-  byMonth: { month: string; charges: number; payments: number }[];
+  byWeek: { week: string; label: string; charges: number; payments: number }[];
   aging: { bucket: string; amountCents: number }[];
 };
 
@@ -201,7 +201,7 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
-        {stats && (stats.aging.some((a) => a.amountCents > 0) || stats.byMonth.some((m) => m.charges > 0 || m.payments > 0)) && (
+        {stats && (stats.aging.some((a) => a.amountCents > 0) || stats.byWeek.some((w) => w.charges > 0 || w.payments > 0)) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             <div className="card p-6">
               <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Aging of receivables</h3>
@@ -216,14 +216,14 @@ export default function DashboardPage() {
               </ResponsiveContainer>
             </div>
             <div className="card p-6">
-              <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Bills vs payments (last 6 months)</h3>
+              <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-4">Bills vs payments (last 6 weeks)</h3>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart
-                  data={stats.byMonth.map((m) => ({ month: m.month, charges: m.charges / 100, payments: m.payments / 100 }))}
+                  data={stats.byWeek.map((w) => ({ week: w.week, label: w.label, charges: w.charges / 100, payments: w.payments / 100 }))}
                   margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                  <XAxis dataKey="week" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + v} />
                   <Tooltip formatter={(v: number) => ["$" + v.toFixed(2), ""]} />
                   <Legend />
