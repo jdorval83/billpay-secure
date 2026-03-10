@@ -1,5 +1,27 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createClientFromRequest } from "@/lib/supabase/server";
 import { supabaseAdmin } from "./supabase";
+
+export class SubdomainAccessDeniedError extends Error {
+  constructor() {
+    super("Access denied. You do not have access to this business.");
+    this.name = "SubdomainAccessDeniedError";
+  }
+}
+
+/** Returns businessId or a 403 Response. Use in API routes: if (r instanceof Response) return r; */
+export async function requireBusinessId(req: Request): Promise<string | Response> {
+  try {
+    return await getBusinessIdForRequest(req);
+  } catch (e) {
+    if (e instanceof SubdomainAccessDeniedError) {
+      return new Response(
+        JSON.stringify({ error: e.message }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    throw e;
+  }
+}
 
 const DEFAULT_BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
 const DEFAULT_SUBDOMAIN = "test";
@@ -43,10 +65,26 @@ export async function getBusinessIdForRequest(req: Request): Promise<string> {
 
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
 
-  // When URL has a subdomain (e.g. farts.billpaysecure.com), use host to resolve — each subdomain = fresh tenant data
+  // When URL has a subdomain (e.g. acme.billpaysecure.com), use host to resolve — each subdomain = fresh tenant data
   if (hasSubdomainInHost(host)) {
+    const hostSlug = getTenantSlugFromHost(host);
     const bizId = await getBusinessIdFromHost(host);
-    if (bizId) return bizId;
+    if (bizId) {
+      // Defense in depth: ensure logged-in user belongs to this subdomain
+      try {
+        const supabase = createClientFromRequest(req);
+        const { data: { user } } = await supabase.auth.getUser();
+        const userSub = user?.user_metadata?.business_subdomain;
+        if (user && userSub && typeof userSub === "string") {
+          if (String(userSub).toLowerCase().trim() !== hostSlug.toLowerCase()) {
+            throw new SubdomainAccessDeniedError();
+          }
+        }
+      } catch (e) {
+        if (e instanceof SubdomainAccessDeniedError) throw e;
+      }
+      return bizId;
+    }
   }
 
   // No subdomain (root, localhost, vercel): use user's business

@@ -73,7 +73,11 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  const { user, response } = await updateSession(request);
+  const { user, response, subdomainMismatch } = await updateSession(request);
+
+  if (subdomainMismatch) {
+    return response;
+  }
 
   // Protect app routes — redirect to login if no session
   if (isProtectedPath(pathname) && !user) {

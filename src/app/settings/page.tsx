@@ -10,6 +10,13 @@ type Business = {
   invoice_footer: string | null;
   past_due_days?: number;
   reminder_interval_days?: number;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  phone?: string | null;
+  website?: string | null;
 };
 
 export default function SettingsPage() {
@@ -17,6 +24,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [profile, setProfile] = useState({ name: "", support_email: "", address_line1: "", address_line2: "", city: "", state: "", postal_code: "", phone: "", website: "" });
   const [footer, setFooter] = useState("");
   const [pastDueDays, setPastDueDays] = useState<number>(0);
   const [reminderIntervalDays, setReminderIntervalDays] = useState<number>(0);
@@ -32,10 +40,22 @@ export default function SettingsPage() {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
         if (data.business) {
-          setBusiness(data.business);
-          setFooter(data.business.invoice_footer || "");
-          setPastDueDays(typeof data.business.past_due_days === "number" ? data.business.past_due_days : 0);
-          setReminderIntervalDays(typeof data.business.reminder_interval_days === "number" ? data.business.reminder_interval_days : 0);
+          const b = data.business;
+          setBusiness(b);
+          setProfile({
+            name: b.name || "",
+            support_email: b.support_email || "",
+            address_line1: b.address_line1 || "",
+            address_line2: b.address_line2 || "",
+            city: b.city || "",
+            state: b.state || "",
+            postal_code: b.postal_code || "",
+            phone: b.phone || "",
+            website: b.website || "",
+          });
+          setFooter(b.invoice_footer || "");
+          setPastDueDays(typeof b.past_due_days === "number" ? b.past_due_days : 0);
+          setReminderIntervalDays(typeof b.reminder_interval_days === "number" ? b.reminder_interval_days : 0);
         } else {
           throw new Error(data.error || "No business data");
         }
@@ -49,23 +69,50 @@ export default function SettingsPage() {
   const handleLogoChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !business) return;
-
     setSaving(true);
     setMessage(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/business/logo", {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch("/api/business/logo", { method: "POST", body: formData });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to upload logo");
-
       setBusiness(json.business);
       setMessage("Logo updated.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Failed to upload logo");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!business) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/business", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: profile.name.trim() || undefined,
+          support_email: profile.support_email.trim() || null,
+          address_line1: profile.address_line1.trim() || null,
+          address_line2: profile.address_line2.trim() || null,
+          city: profile.city.trim() || null,
+          state: profile.state.trim() || null,
+          postal_code: profile.postal_code.trim() || null,
+          phone: profile.phone.trim() || null,
+          website: profile.website.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to save");
+      setBusiness(json.business);
+      setMessage("Profile updated. Your logo, name, address, and contact info appear on bill PDFs.");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -85,9 +132,7 @@ export default function SettingsPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to save");
       setBusiness(json.business);
-      setPastDueDays(typeof json.business?.past_due_days === "number" ? json.business.past_due_days : pastDueDays);
-      setReminderIntervalDays(typeof json.business?.reminder_interval_days === "number" ? json.business.reminder_interval_days : reminderIntervalDays);
-      setMessage("Updated successfully.");
+      setMessage("Billing settings updated.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Failed to save");
     } finally {
@@ -108,8 +153,7 @@ export default function SettingsPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to save");
-      setBusiness(json.business);
-      setMessage("Updated successfully.");
+      setMessage("Footer updated.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Failed to save");
     } finally {
@@ -168,7 +212,7 @@ export default function SettingsPage() {
       <main className="page-container">
         <div className="content-max">
           <h1 className="text-2xl font-bold text-slate-900 mb-4">Settings</h1>
-          <p className="text-sm text-red-600">{message || "Unable to load business settings."}</p>
+          <p className="text-sm text-red-600">{message || "Unable to load settings."}</p>
         </div>
       </main>
     );
@@ -176,146 +220,106 @@ export default function SettingsPage() {
 
   return (
     <main className="page-container">
-      <div className="content-max space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
-          <p className="text-sm text-slate-500">{business.name}</p>
-        </div>
+      <div className="content-max space-y-8 max-w-2xl">
+        <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
         {message && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <div className={`rounded-lg border px-3 py-2 text-sm ${message.includes("Failed") || message.includes("incorrect") ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
             {message}
           </div>
         )}
-        <div className="card p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-slate-800">Branding</h2>
-          <div className="flex items-center gap-4">
+
+        <section className="card p-6 space-y-4">
+          <h2 className="text-base font-semibold text-slate-800">Business profile</h2>
+          <p className="text-xs text-slate-500">This information and your logo appear on bill PDFs and in the app.</p>
+          <div className="flex items-start gap-4">
             {business.logo_url ? (
-              <img
-                src={business.logo_url}
-                alt="Logo"
-                className="h-10 w-10 rounded-md border border-slate-200 object-contain bg-white"
-              />
+              <img src={business.logo_url} alt="Logo" className="h-16 w-16 rounded-lg border border-slate-200 object-contain bg-white shrink-0" />
             ) : (
-              <div className="h-10 w-10 rounded-md border border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-400">
-                No logo
-              </div>
+              <div className="h-16 w-16 rounded-lg border border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-400 shrink-0">Logo</div>
             )}
-            <div>
-              <label className="label">Upload logo</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleLogoChange}
-                disabled={saving}
-                className="text-sm"
-              />
-              <p className="mt-1 text-xs text-slate-500">
-                JPG or PNG, square works best. Used in the app header and on sent bill PDFs.
-              </p>
+            <div className="flex-1">
+              <label className="label">Logo</label>
+              <input type="file" accept="image/*" onChange={handleLogoChange} disabled={saving} className="text-sm" />
             </div>
           </div>
-        </div>
-        <div className="card p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-slate-800">Billing</h2>
+          <div>
+            <label className="label">Business name</label>
+            <input type="text" value={profile.name} onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))} className="input" placeholder="Your business name" />
+          </div>
+          <div>
+            <label className="label">Email (support / billing)</label>
+            <input type="email" value={profile.support_email} onChange={(e) => setProfile((p) => ({ ...p, support_email: e.target.value }))} className="input" placeholder="contact@example.com" />
+          </div>
+          <div>
+            <label className="label">Phone</label>
+            <input type="tel" value={profile.phone} onChange={(e) => setProfile((p) => ({ ...p, phone: e.target.value }))} className="input" placeholder="(555) 123-4567" />
+          </div>
+          <div>
+            <label className="label">Website</label>
+            <input type="url" value={profile.website} onChange={(e) => setProfile((p) => ({ ...p, website: e.target.value }))} className="input" placeholder="https://example.com" />
+          </div>
+          <div>
+            <label className="label">Address</label>
+            <input type="text" value={profile.address_line1} onChange={(e) => setProfile((p) => ({ ...p, address_line1: e.target.value }))} className="input mb-2" placeholder="Street address" />
+            <input type="text" value={profile.address_line2} onChange={(e) => setProfile((p) => ({ ...p, address_line2: e.target.value }))} className="input mb-2" placeholder="Suite, unit, etc." />
+            <div className="flex gap-2">
+              <input type="text" value={profile.city} onChange={(e) => setProfile((p) => ({ ...p, city: e.target.value }))} className="input flex-1" placeholder="City" />
+              <input type="text" value={profile.state} onChange={(e) => setProfile((p) => ({ ...p, state: e.target.value }))} className="input w-24" placeholder="State" />
+              <input type="text" value={profile.postal_code} onChange={(e) => setProfile((p) => ({ ...p, postal_code: e.target.value }))} className="input w-28" placeholder="ZIP" />
+            </div>
+          </div>
+          <button type="button" onClick={handleSaveProfile} disabled={saving} className="btn-primary">
+            {saving ? "Saving…" : "Save profile"}
+          </button>
+        </section>
+
+        <section className="card p-6 space-y-4">
+          <h2 className="text-base font-semibold text-slate-800">Billing rules</h2>
           <div>
             <label className="label">Days until past due</label>
-            <input
-              type="number"
-              min={0}
-              max={365}
-              value={pastDueDays}
-              onChange={(e) => setPastDueDays(Math.max(0, Math.min(365, parseInt(e.target.value, 10) || 0)))}
-              className="input w-24"
-            />
-            <p className="mt-1 text-xs text-slate-500">Number of days after the due date before a bill is considered past due. 0 = due date is the cutoff.</p>
+            <input type="number" min={0} max={365} value={pastDueDays} onChange={(e) => setPastDueDays(Math.max(0, Math.min(365, parseInt(e.target.value, 10) || 0)))} className="input w-24" />
+            <p className="mt-1 text-xs text-slate-500">Days after due date before a bill is past due. 0 = due date.</p>
           </div>
           <div>
             <label className="label">Recurring reminder interval (days)</label>
-            <input
-              type="number"
-              min={0}
-              max={365}
-              value={reminderIntervalDays}
-              onChange={(e) => setReminderIntervalDays(Math.max(0, Math.min(365, parseInt(e.target.value, 10) || 0)))}
-              className="input w-24"
-            />
-            <p className="mt-1 text-xs text-slate-500">Send automatic text reminders with payment links every N days for past-due bills. 0 = disabled.</p>
+            <input type="number" min={0} max={365} value={reminderIntervalDays} onChange={(e) => setReminderIntervalDays(Math.max(0, Math.min(365, parseInt(e.target.value, 10) || 0)))} className="input w-24" />
+            <p className="mt-1 text-xs text-slate-500">Text reminders for past-due bills every N days. 0 = disabled.</p>
           </div>
-          <div className="flex justify-end">
-            <button type="button" onClick={handleSaveBilling} disabled={saving} className="btn-primary">
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </div>
-        </div>
-        <div className="card p-6 space-y-3">
-          <h2 className="text-sm font-semibold text-slate-800">Sent bill footer</h2>
-          <textarea
-            value={footer}
-            onChange={(e) => setFooter(e.target.value)}
-            rows={3}
-            className="input min-h-[80px]"
-          />
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={handleSaveFooter}
-              disabled={saving}
-              className="btn-primary"
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </div>
-        </div>
-        <div className="card p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-slate-800">Password</h2>
-          <p className="text-xs text-slate-500">
-            Change the password for your account. You&apos;ll use this password on all devices.
-          </p>
+          <button type="button" onClick={handleSaveBilling} disabled={saving} className="btn-primary">
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </section>
+
+        <section className="card p-6 space-y-3">
+          <h2 className="text-base font-semibold text-slate-800">Bill footer</h2>
+          <textarea value={footer} onChange={(e) => setFooter(e.target.value)} rows={3} className="input min-h-[80px]" placeholder="Thank you for your business…" />
+          <button type="button" onClick={handleSaveFooter} disabled={saving} className="btn-primary">
+            {saving ? "Saving…" : "Save footer"}
+          </button>
+        </section>
+
+        <section className="card p-6 space-y-4">
+          <h2 className="text-base font-semibold text-slate-800">Password</h2>
+          <p className="text-xs text-slate-500">Change your account password. Use it on all devices and subdomains.</p>
           <div>
             <label className="label">Current password</label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              className="input max-w-xs"
-              autoComplete="current-password"
-            />
+            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="input max-w-xs" autoComplete="current-password" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
             <div>
               <label className="label">New password</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="input"
-                autoComplete="new-password"
-              />
+              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input" autoComplete="new-password" />
             </div>
             <div>
               <label className="label">Confirm new password</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="input"
-                autoComplete="new-password"
-              />
+              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="input" autoComplete="new-password" />
             </div>
           </div>
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={handleChangePassword}
-              disabled={passwordSaving}
-              className="btn-primary"
-            >
-              {passwordSaving ? "Updating…" : "Update password"}
-            </button>
-          </div>
-        </div>
+          <button type="button" onClick={handleChangePassword} disabled={passwordSaving} className="btn-primary">
+            {passwordSaving ? "Updating…" : "Update password"}
+          </button>
+        </section>
       </div>
     </main>
   );
 }
-

@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     const { data: invoice, error: invoiceError } = await supabaseAdmin
       .from("invoices")
-      .select("*, customers(name, email, phone, address_line1, address_line2, city, state, postal_code)")
+      .select("*, customers(name, email, phone)")
       .eq("public_token", token)
       .single();
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type BusinessMeta = {
   name: string;
@@ -11,11 +11,19 @@ type BusinessMeta = {
 
 export default function Home() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [business, setBusiness] = useState<BusinessMeta | null>(null);
+
+  useEffect(() => {
+    const err = searchParams.get("error");
+    if (err === "wrong_subdomain") {
+      setError("You do not have access to that business. Sign in with the correct account for that subdomain.");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetch("/api/business")

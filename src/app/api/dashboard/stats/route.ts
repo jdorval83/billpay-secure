@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getBusinessIdForRequest } from "@/lib/tenant";
+import { requireBusinessId } from "@/lib/tenant";
 
 export async function GET(request: Request) {
-  const businessId = await getBusinessIdForRequest(request);
+  const businessIdOr403 = await requireBusinessId(request);
+  if (businessIdOr403 instanceof Response) return businessIdOr403;
+  const businessId = businessIdOr403;
   const { searchParams } = new URL(request.url);
   const fromParam = searchParams.get("from");
   const toParam = searchParams.get("to");

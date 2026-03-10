@@ -25,6 +25,14 @@ type BusinessData = {
   name?: string;
   support_email?: string;
   invoice_footer?: string;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  logo_url?: string | null;
 };
 
 export async function generateInvoicePdf(
@@ -39,7 +47,12 @@ export async function generateInvoicePdf(
   const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
   const bizName = business?.name ?? "BillPay Secure";
-  const supportEmail = business?.support_email ?? "support@billpaysecure.com";
+  const supportEmail = business?.support_email ?? "";
+  const bizAddr1 = business?.address_line1 || "";
+  const bizAddr2 = business?.address_line2 || "";
+  const bizCity = [business?.city, business?.state, business?.postal_code].filter(Boolean).join(", ");
+  const bizPhone = business?.phone || "";
+  const bizWebsite = business?.website || "";
 
   const issuedDate = invoice.issued_at
     ? new Date(invoice.issued_at).toLocaleDateString()
@@ -51,9 +64,34 @@ export async function generateInvoicePdf(
   let y = height - 50;
 
   page.drawText(bizName, { x: 50, y, size: 18, font: helveticaBold, color: rgb(0, 0, 0) });
-  y -= 16;
-  page.drawText(supportEmail, { x: 50, y, size: 10, font: helvetica, color: rgb(0.33, 0.33, 0.33) });
-  y -= 24;
+  y -= 14;
+  if (supportEmail) {
+    page.drawText(supportEmail, { x: 50, y, size: 10, font: helvetica, color: rgb(0.33, 0.33, 0.33) });
+    y -= 14;
+  }
+  if (bizAddr1 || bizCity) {
+    if (bizAddr1) {
+      page.drawText(bizAddr1.slice(0, 50), { x: 50, y, size: 9, font: helvetica, color: rgb(0.33, 0.33, 0.33) });
+      y -= 12;
+    }
+    if (bizAddr2) {
+      page.drawText(bizAddr2.slice(0, 50), { x: 50, y, size: 9, font: helvetica, color: rgb(0.33, 0.33, 0.33) });
+      y -= 12;
+    }
+    if (bizCity) {
+      page.drawText(bizCity.slice(0, 50), { x: 50, y, size: 9, font: helvetica, color: rgb(0.33, 0.33, 0.33) });
+      y -= 12;
+    }
+  }
+  if (bizPhone) {
+    page.drawText(bizPhone.slice(0, 30), { x: 50, y, size: 9, font: helvetica, color: rgb(0.33, 0.33, 0.33) });
+    y -= 12;
+  }
+  if (bizWebsite) {
+    page.drawText(bizWebsite.slice(0, 40), { x: 50, y, size: 9, font: helvetica, color: rgb(0.33, 0.33, 0.33) });
+    y -= 14;
+  }
+  y -= 10;
 
   page.drawText(`Bill ${invoice.invoice_number}`, {
     x: width - 150,
