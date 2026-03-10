@@ -20,6 +20,10 @@ export default function SettingsPage() {
   const [footer, setFooter] = useState("");
   const [pastDueDays, setPastDueDays] = useState<number>(0);
   const [reminderIntervalDays, setReminderIntervalDays] = useState<number>(0);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -110,6 +114,37 @@ export default function SettingsPage() {
       setMessage(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || newPassword.length < 8) {
+      setMessage("New password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setMessage("New password and confirmation do not match.");
+      return;
+    }
+    setPasswordSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to change password");
+      setMessage("Password updated.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Failed to change password");
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -228,6 +263,54 @@ export default function SettingsPage() {
               className="btn-primary"
             >
               {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+        <div className="card p-6 space-y-4">
+          <h2 className="text-sm font-semibold text-slate-800">Password</h2>
+          <p className="text-xs text-slate-500">
+            Change the password for your account. You&apos;ll use this password on all devices.
+          </p>
+          <div>
+            <label className="label">Current password</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="input max-w-xs"
+              autoComplete="current-password"
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+            <div>
+              <label className="label">New password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="input"
+                autoComplete="new-password"
+              />
+            </div>
+            <div>
+              <label className="label">Confirm new password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="input"
+                autoComplete="new-password"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleChangePassword}
+              disabled={passwordSaving}
+              className="btn-primary"
+            >
+              {passwordSaving ? "Updating…" : "Update password"}
             </button>
           </div>
         </div>
