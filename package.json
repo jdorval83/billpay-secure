@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "create-admin": "node scripts/create-admin.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

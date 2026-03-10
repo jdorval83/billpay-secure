@@ -49,16 +49,23 @@ export async function GET(request: Request) {
     rangeStart.setDate(rangeStart.getDate() - (weeksParam - 1) * 7);
     rangeStart.setHours(0, 0, 0, 0);
   }
-  const rangeStartISO = rangeStart.toISOString();
-  const rangeEndISO = rangeEnd.toISOString();
-  const rangeStartYMD = rangeStartISO.slice(0, 10);
-  const rangeEndYMD = rangeEndISO.slice(0, 10);
+  const rangeStartYMD = fromParam || rangeStart.toISOString().slice(0, 10);
+  const rangeEndYMD = toParam || rangeEnd.toISOString().slice(0, 10);
+
+  const getDateYMD = (iso: string | null) => (iso ? iso.slice(0, 10) : "");
 
   const billedInPeriod = billList
-    .filter((b) => b.created_at >= rangeStartISO && b.created_at <= rangeEndISO)
+    .filter((b) => {
+      const d = getDateYMD(b.created_at);
+      return d && d >= rangeStartYMD && d <= rangeEndYMD;
+    })
     .reduce((s, b) => s + (b.amount_cents || 0), 0);
   const paidBillsInPeriod = billList.filter(
-    (b) => (b.status || "").toLowerCase() === "paid" && b.paid_at && b.paid_at >= rangeStartISO && b.paid_at <= rangeEndISO
+    (b) =>
+      (b.status || "").toLowerCase() === "paid" &&
+      b.paid_at &&
+      getDateYMD(b.paid_at) >= rangeStartYMD &&
+      getDateYMD(b.paid_at) <= rangeEndYMD
   );
   const paymentsFromBillsInPeriod = paidBillsInPeriod.reduce((s, b) => s + (b.amount_cents || 0), 0);
   const paymentsFromRecordsInPeriod = records
@@ -101,12 +108,18 @@ export async function GET(request: Request) {
     const end = weekEnd.toISOString();
     const startYMD = start.slice(0, 10);
     const endYMD = end.slice(0, 10);
-    const chargesThisWeek = billList.filter(
-      (b) => b.created_at >= start && b.created_at <= end
-    ).reduce((s, b) => s + (b.amount_cents || 0), 0);
-    const paidThisWeek = billList.filter(
-      (b) => b.paid_at && b.paid_at >= start && b.paid_at <= end
-    ).reduce((s, b) => s + (b.amount_cents || 0), 0);
+    const chargesThisWeek = billList
+      .filter((b) => {
+        const d = getDateYMD(b.created_at);
+        return d && d >= startYMD && d <= endYMD;
+      })
+      .reduce((s, b) => s + (b.amount_cents || 0), 0);
+    const paidThisWeek = billList
+      .filter((b) => {
+        const d = getDateYMD(b.paid_at);
+        return d && d >= startYMD && d <= endYMD;
+      })
+      .reduce((s, b) => s + (b.amount_cents || 0), 0);
     const recordedThisWeek = records.filter(
       (r) => r.paid_at >= startYMD && r.paid_at <= endYMD
     ).reduce((s, r) => s + (r.amount_cents || 0), 0);

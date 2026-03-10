@@ -13,7 +13,7 @@ export default function SignupPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState<{ loginUrl: string; subdomain: string } | null>(null);
+  const [success, setSuccess] = useState<{ subdomain: string; message: string } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +36,7 @@ export default function SignupPage() {
         setError(data.error || "Signup failed");
         return;
       }
-      setSuccess({ loginUrl: data.loginUrl, subdomain: data.subdomain });
+      setSuccess({ subdomain: data.subdomain, message: data.message || "Your request has been submitted." });
     } catch {
       setError("Signup failed");
     } finally {
@@ -51,21 +51,16 @@ export default function SignupPage() {
         <div className="flex-1 flex items-center justify-center p-8 bg-slate-50">
           <div className="w-full max-w-md">
             <div className="card p-8 shadow-lg">
-              <h2 className="text-xl font-semibold text-slate-900 mb-2">Account created</h2>
+              <h2 className="text-xl font-semibold text-slate-900 mb-2">Request submitted</h2>
               <p className="text-slate-600 text-sm mb-6">
-                Your environment is ready. Sign in to get started.
+                {success.message}
               </p>
-              <a
-                href={success.loginUrl}
+              <Link
+                href="/"
                 className="btn-primary w-full py-3 block text-center"
               >
-                Go to {success.subdomain}.billpaysecure.com →
-              </a>
-              <p className="mt-4 text-xs text-slate-500 text-center">
-                <Link href="/" className="text-emerald-600 hover:underline">
-                  Back to sign in
-                </Link>
-              </p>
+                Back to sign in
+              </Link>
             </div>
           </div>
         </div>

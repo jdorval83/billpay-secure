@@ -1,9 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 
 const PAGE_SIZE = 20;
+
+type Bill = {
+  id: string;
+  customer_id: string;
+  balance_cents: number;
+  due_date: string;
+  status: string;
+  customers?: { name?: string | null } | null;
+};
 
 type Invoice = {
   id: string;
@@ -29,6 +38,20 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const [showAll, setShowAll] = useState(false);
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
+  const [recordPaymentSubmitting, setRecordPaymentSubmitting] = useState(false);
+  const [recordPaymentMessage, setRecordPaymentMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [recordPaymentForm, setRecordPaymentForm] = useState({
+    amount: "",
+    check_number: "",
+    payer_name: "",
+    paid_at: new Date().toISOString().slice(0, 10),
+    notes: "",
+    bill_ids: [] as string[],
+    file: null as File | null,
+  });
+  const recordPaymentRef = useRef<HTMLFormElement>(null);
 
   const filteredInvoices = useMemo(() => {
     let out = invoices;
@@ -67,6 +90,87 @@ export default function InvoicesPage() {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (recordPaymentOpen) {
+      fetch("/api/bills")
+        .then((r) => r.json())
+        .then((d) => setBills(d.bills || []))
+        .catch(() => setBills([]));
+    }
+  }, [recordPaymentOpen]);
+
+  const unpaidBills = useMemo(
+    () =>
+      bills.filter(
+        (b) =>
+          (b.balance_cents ?? 0) > 0 &&
+          (b.status || "").toLowerCase() !== "void"
+      ),
+    [bills]
+  );
+
+  const handleRecordPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amountCents = Math.round(parseFloat(recordPaymentForm.amount || "0") * 100);
+    if (amountCents <= 0) {
+      setRecordPaymentMessage({ type: "error", text: "Enter a valid amount." });
+      return;
+    }
+    setRecordPaymentSubmitting(true);
+    setRecordPaymentMessage(null);
+    try {
+      const formData = new FormData();
+      formData.set("amount_cents", String(amountCents));
+      formData.set("check_number", recordPaymentForm.check_number);
+      formData.set("payer_name", recordPaymentForm.payer_name);
+      formData.set("paid_at", recordPaymentForm.paid_at);
+      formData.set("notes", recordPaymentForm.notes);
+      formData.set("bill_ids", JSON.stringify(recordPaymentForm.bill_ids));
+      if (recordPaymentForm.file) formData.set("file", recordPaymentForm.file);
+      const res = await fetch("/api/payment-records", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to record payment");
+      setRecordPaymentMessage({
+        type: "success",
+        text: data.billsMarkedPaid
+          ? `Payment recorded. ${data.billsMarkedPaid} bill(s) marked paid.`
+          : "Payment recorded.",
+      });
+      setRecordPaymentOpen(false);
+      setRecordPaymentForm({
+        amount: "",
+        check_number: "",
+        payer_name: "",
+        paid_at: new Date().toISOString().slice(0, 10),
+        notes: "",
+        bill_ids: [],
+        file: null,
+      });
+      fetch("/api/invoices").then((r) => r.json()).then((d) => setInvoices(d.invoices || []));
+      fetch("/api/bills").then((r) => r.json()).then((d) => setBills(d.bills || []));
+    } catch (err) {
+      setRecordPaymentMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to record payment",
+      });
+    } finally {
+      setRecordPaymentSubmitting(false);
+    }
+  };
+
+  const toggleRecordPaymentBill = (id: string) => {
+    setRecordPaymentForm((f) => ({
+      ...f,
+      bill_ids: f.bill_ids.includes(id)
+        ? f.bill_ids.filter((x) => x !== id)
+        : [...f.bill_ids, id],
+    }));
+  };
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -126,17 +230,162 @@ export default function InvoicesPage() {
       <div className="content-max">
         <div className="flex items-center justify-between gap-4 mb-6">
           <h1 className="text-2xl font-bold text-slate-900">Sent bills</h1>
-          {canDelete ? (
-            <button
-              type="button"
-              onClick={handleDeleteSelected}
-              disabled={deleting}
-              className="btn-secondary"
-            >
-              {deleting ? "Deleting…" : `Delete (${selectedInvoices.length})`}
-            </button>
-          ) : null}
+          <div className="flex items-center gap-3">
+            {!recordPaymentOpen ? (
+              <button
+                type="button"
+                onClick={() => setRecordPaymentOpen(true)}
+                className="btn-secondary text-sm py-2"
+              >
+                Record payment (check / cash)
+              </button>
+            ) : null}
+            {canDelete ? (
+              <button
+                type="button"
+                onClick={handleDeleteSelected}
+                disabled={deleting}
+                className="btn-secondary"
+              >
+                {deleting ? "Deleting…" : `Delete (${selectedInvoices.length})`}
+              </button>
+            ) : null}
+          </div>
         </div>
+        {recordPaymentMessage && (
+          <div
+            className={`mb-4 rounded-lg border p-3 text-sm ${
+              recordPaymentMessage.type === "error"
+                ? "border-red-200 bg-red-50 text-red-800"
+                : "border-emerald-200 bg-emerald-50 text-emerald-800"
+            }`}
+          >
+            {recordPaymentMessage.text}
+          </div>
+        )}
+        {recordPaymentOpen && (
+          <div className="card p-6 mb-6">
+            <h2 className="text-base font-semibold text-slate-800 mb-4">Record payment (check / cash)</h2>
+            <form ref={recordPaymentRef} onSubmit={handleRecordPayment} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Amount ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={recordPaymentForm.amount}
+                    onChange={(e) =>
+                      setRecordPaymentForm((f) => ({ ...f, amount: e.target.value }))
+                    }
+                    className="input"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label">Payment date</label>
+                  <input
+                    type="date"
+                    value={recordPaymentForm.paid_at}
+                    onChange={(e) =>
+                      setRecordPaymentForm((f) => ({ ...f, paid_at: e.target.value }))
+                    }
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Check number (optional)</label>
+                  <input
+                    type="text"
+                    value={recordPaymentForm.check_number}
+                    onChange={(e) =>
+                      setRecordPaymentForm((f) => ({ ...f, check_number: e.target.value }))
+                    }
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Payer (optional)</label>
+                  <input
+                    type="text"
+                    value={recordPaymentForm.payer_name}
+                    onChange={(e) =>
+                      setRecordPaymentForm((f) => ({ ...f, payer_name: e.target.value }))
+                    }
+                    className="input"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="label">Notes (optional)</label>
+                <textarea
+                  value={recordPaymentForm.notes}
+                  onChange={(e) =>
+                    setRecordPaymentForm((f) => ({ ...f, notes: e.target.value }))
+                  }
+                  className="input min-h-[60px]"
+                  rows={2}
+                />
+              </div>
+              <div>
+                <label className="label">Photo (optional)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    setRecordPaymentForm((f) => ({
+                      ...f,
+                      file: e.target.files?.[0] ?? null,
+                    }))
+                  }
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">Mark these bills paid</label>
+                <div className="max-h-32 overflow-y-auto border rounded-lg p-2 space-y-1">
+                  {unpaidBills.length === 0 ? (
+                    <p className="text-sm text-slate-500">No unpaid bills</p>
+                  ) : (
+                    unpaidBills.map((b) => (
+                      <label key={b.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={recordPaymentForm.bill_ids.includes(b.id)}
+                          onChange={() => toggleRecordPaymentBill(b.id)}
+                          className="rounded"
+                        />
+                        <span className="text-sm">
+                          {(b.customers as { name?: string })?.name ?? "—"} —{" "}
+                          {formatMoney(b.balance_cents)} — {b.due_date}
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={recordPaymentSubmitting}
+                  className="btn-primary"
+                >
+                  {recordPaymentSubmitting ? "Saving…" : "Record payment"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecordPaymentOpen(false);
+                    setRecordPaymentMessage(null);
+                  }}
+                  className="btn-secondary"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
         {loading ? (
           <div className="card p-8">
             <div className="skeleton h-4 w-32 mb-4" />

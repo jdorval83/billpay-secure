@@ -33,12 +33,23 @@ type AdminStats = {
   invoices: number;
 };
 
+type SignupRequest = {
+  id: string;
+  business_name: string | null;
+  subdomain: string | null;
+  email: string | null;
+  support_email: string | null;
+  status: string | null;
+  created_at: string | null;
+};
+
 export default function AdminPage() {
   const [current, setCurrent] = useState<CurrentBusiness | null>(null);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [signupRequests, setSignupRequests] = useState<SignupRequest[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Business>>({});
 
@@ -49,10 +60,12 @@ export default function AdminPage() {
       fetch("/api/business").then((r) => r.json()),
       fetch("/api/admin/businesses").then((r) => r.json()).catch(() => ({ businesses: [] })),
       fetch("/api/admin/stats").then((r) => r.json()).catch(() => null),
-    ]).then(([bRes, aRes, sRes]) => {
+      fetch("/api/admin/signup-requests").then((r) => r.json()).catch(() => ({ requests: [] })),
+    ]).then(([bRes, aRes, sRes, srRes]) => {
       if (bRes.business) setCurrent(bRes.business);
       if (aRes.businesses && !aRes.error) setBusinesses(aRes.businesses);
       if (sRes && !sRes.error) setStats(sRes);
+      if (srRes.requests && !srRes.error) setSignupRequests(srRes.requests);
       setLoading(false);
     });
   }, []);
@@ -78,6 +91,32 @@ export default function AdminPage() {
         type: "error",
         text: e instanceof Error ? e.message : "Failed to update",
       });
+    }
+  };
+
+  const handleApproveSignup = async (id: string) => {
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/admin/signup-requests/${id}/approve`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to approve");
+      setSignupRequests((prev) => prev.filter((r) => r.id !== id));
+      setMessage({ type: "success", text: "Account created." });
+    } catch (e) {
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to approve" });
+    }
+  };
+
+  const handleRejectSignup = async (id: string) => {
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/admin/signup-requests/${id}/reject`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to reject");
+      setSignupRequests((prev) => prev.filter((r) => r.id !== id));
+      setMessage({ type: "success", text: "Request rejected." });
+    } catch (e) {
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to reject" });
     }
   };
 
@@ -152,6 +191,55 @@ export default function AdminPage() {
 
         {isPlatform && (
           <>
+            {signupRequests.length > 0 && (
+              <section className="card p-6 mb-8 border-amber-200 bg-amber-50/30">
+                <h2 className="text-lg font-semibold text-slate-900 mb-3">Pending signup requests</h2>
+                <p className="text-sm text-slate-600 mb-4">Review and approve or reject new account requests.</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-left">
+                        <th className="p-3 font-semibold text-slate-700">Business</th>
+                        <th className="p-3 font-semibold text-slate-700">Subdomain</th>
+                        <th className="p-3 font-semibold text-slate-700">Email</th>
+                        <th className="p-3 font-semibold text-slate-700">Requested</th>
+                        <th className="p-3 font-semibold text-slate-700 w-40">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {signupRequests.map((r) => (
+                        <tr key={r.id} className="border-b border-slate-100">
+                          <td className="p-3 font-medium text-slate-900">{r.business_name ?? "—"}</td>
+                          <td className="p-3 text-slate-600">{r.subdomain ?? "—"}</td>
+                          <td className="p-3 text-slate-600">{r.email ?? "—"}</td>
+                          <td className="p-3 text-slate-600">
+                            {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
+                          </td>
+                          <td className="p-3">
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleApproveSignup(r.id)}
+                                className="text-emerald-600 font-medium hover:text-emerald-700"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectSignup(r.id)}
+                                className="text-red-600 font-medium hover:text-red-700"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
             {stats && (
               <section className="card p-6 mb-8">
                 <h2 className="text-lg font-semibold text-slate-900 mb-4">Platform overview</h2>

@@ -78,6 +78,7 @@ export default function Nav() {
           {link("/templates", "Templates")}
           {link("/invoices", "Sent bills")}
           {link("/reports", "Reports")}
+          {business?.kind === "platform" && link("/admin", "Admin")}
           {link("/settings", "Settings")}
           <Link href="/bills/new" className="btn-primary text-sm py-2">
             New bill

@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 
-const PRODUCTION_DOMAIN = "billpaysecure.com";
-
 function slugifySubdomain(input: string): string {
   return input
     .toLowerCase()
@@ -11,6 +9,7 @@ function slugifySubdomain(input: string): string {
     .replace(/^-|-$/g, "");
 }
 
+/** Create a signup request instead of auto-creating. Admin approves from /admin */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -59,43 +58,36 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Subdomain "${slug}" is already taken` }, { status: 400 });
     }
 
-    const slugForBusiness = slugifySubdomain(businessName) || slug;
+    const { data: existingRequest } = await supabaseAdmin
+      .from("signup_requests")
+      .select("id")
+      .eq("subdomain", slug)
+      .eq("status", "pending")
+      .maybeSingle();
 
-    const { data: business, error: bizError } = await supabaseAdmin
-      .from("businesses")
+    if (existingRequest) {
+      return NextResponse.json({ error: `A request for subdomain "${slug}" is already pending` }, { status: 400 });
+    }
+
+    const { error: insertError } = await supabaseAdmin
+      .from("signup_requests")
       .insert({
-        name: businessName.trim(),
-        slug: slugForBusiness,
+        business_name: businessName.trim(),
         subdomain: slug,
-        support_email: (supportEmail || email).trim(),
-        kind: "tenant",
-      })
-      .select("id, name, subdomain")
-      .single();
+        email: email.trim(),
+        password_temp: password,
+        support_email: (supportEmail || email).trim() || null,
+        status: "pending",
+      });
 
-    if (bizError) {
-      return NextResponse.json({ error: bizError.message }, { status: 500 });
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
-
-    const { error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: email.trim(),
-      password,
-      email_confirm: true,
-      user_metadata: { business_subdomain: slug, business_id: business.id },
-    });
-
-    if (authError) {
-      return NextResponse.json({ error: authError.message }, { status: 400 });
-    }
-
-    const loginUrl = `https://${slug}.${PRODUCTION_DOMAIN}/`;
 
     return NextResponse.json({
       success: true,
       subdomain: slug,
-      businessId: business.id,
-      loginUrl,
-      message: `Account created. Log in at ${loginUrl}`,
+      message: "Your request has been submitted. We'll review it and send you access when ready.",
     });
   } catch (err) {
     return NextResponse.json(
