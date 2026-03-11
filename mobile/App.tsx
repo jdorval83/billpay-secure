@@ -129,14 +129,18 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Lazy-load data per screen to avoid timeouts from multiple parallel requests
   useEffect(() => {
     if (!session) return;
-    loadBills();
-    loadCustomers();
-    loadTemplates();
-    loadInvoices();
-    loadBusiness();
-  }, [session]);
+    if (activeScreen === "bills") {
+      loadBills();
+      loadCustomers(); // needed for New bill customer picker
+    }
+    if (activeScreen === "customers") loadCustomers();
+    if (activeScreen === "templates") loadTemplates();
+    if (activeScreen === "sent-bills") loadInvoices();
+    if (activeScreen === "settings") loadBusiness();
+  }, [session, activeScreen]);
 
   const loadBills = () => {
     setBillsLoading(true);
