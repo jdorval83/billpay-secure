@@ -63,6 +63,32 @@ export async function getBusinessIdForRequest(req: Request): Promise<string> {
     return override.trim();
   }
 
+  // Mobile app: Authorization Bearer token
+  const authHeader = req.headers.get("authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (bearerToken) {
+    const { createClient } = await import("@supabase/supabase-js");
+    const client = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data: { user }, error } = await client.auth.getUser(bearerToken);
+    if (error || !user) throw new SubdomainAccessDeniedError();
+    const meta = user.user_metadata;
+    const bizId = meta?.business_id;
+    if (bizId && typeof bizId === "string") return bizId.trim();
+    const subdomain = meta?.business_subdomain;
+    if (subdomain && typeof subdomain === "string") {
+      const { data } = await supabaseAdmin
+        .from("businesses")
+        .select("id")
+        .eq("subdomain", String(subdomain).toLowerCase())
+        .maybeSingle();
+      if (data) return data.id as string;
+    }
+    // If we can't resolve from metadata, fall through to host-based logic below.
+  }
+
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
 
   // When URL has a subdomain (e.g. acme.billpaysecure.com), use host to resolve — each subdomain = fresh tenant data

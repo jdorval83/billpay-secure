@@ -67,8 +67,11 @@ export async function middleware(request: NextRequest) {
     if (isProtectedPath(pathname) && !user) {
       return NextResponse.redirect(new URL("/", request.url), 307);
     }
-    if (isProtectedApi(pathname) && !isPublicPath(pathname) && !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (isProtectedApi(pathname) && !isPublicPath(pathname)) {
+      const hasBearer = request.headers.get("authorization")?.startsWith("Bearer ");
+      if (!user && !hasBearer) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
     }
     return response;
   }
@@ -84,9 +87,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url), 307);
   }
 
-  // Protect API routes — return 401 if no session
-  if (isProtectedApi(pathname) && !isPublicPath(pathname) && !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Protect API routes — return 401 if no session (Bearer token allowed for mobile)
+  if (isProtectedApi(pathname) && !isPublicPath(pathname)) {
+    const hasBearer = request.headers.get("authorization")?.startsWith("Bearer ");
+    if (!user && !hasBearer) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   return response;
