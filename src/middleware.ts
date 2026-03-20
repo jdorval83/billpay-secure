@@ -27,11 +27,12 @@ const PROTECTED_API_PREFIXES = [
   "/api/admin",
 ];
 
-const PUBLIC_PATHS = ["/", "/signup", "/privacy", "/terms", "/compliance"];
+const PUBLIC_PATHS = ["/", "/signup", "/privacy", "/terms", "/compliance", "/sms-opt-in"];
 const PUBLIC_API_PREFIXES = ["/api/auth", "/api/public"];
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.includes(pathname)) return true;
+  if (pathname.startsWith("/compliance/")) return true;
   if (pathname.startsWith("/public/")) return true;
   return PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p));
 }
